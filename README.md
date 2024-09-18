@@ -2,7 +2,7 @@
 
 Areion is a lightweight, fast, and extensible Python web server framework. It supports multithreading, routing, orchestration, and customizable loggers and template engines.
 
-Some say it is the simplest API ever. They might be right. To return a JSON response, you just return a dictionary. To return an HTML response, you just return a string. That's it.
+Some say it is the simplest API ever. They might be right. To return a JSON response, you just return a dictionary. To return an HTML response, you just return a string. Return bytes for an octet-stream response. That's it.
 
 Every component (Orchestrator, Router, Logger, etc.) is optional and can be replaced with your own implementation, just implement the interface. You can also add your own components to the server and easily extend its functionality.
 
@@ -10,9 +10,9 @@ Every component (Orchestrator, Router, Logger, etc.) is optional and can be repl
 
 - **Simple API**: Return dictionaries for JSON responses and strings for HTML responses.
 - **Multithreading**: Support for multi-threading for concurrent requests.
-- **Routing**: High-performance router that supports various HTTP methods (GET, POST, PUT, DELETE).
+- **Routing**: High-performance router that supports various HTTP methods (GET, POST, PUT, DELETE) with method control at both route and group levels.
 - **Orchestration**: Orchestrator Handler for managing tasks like thread management, background jobs, and task queues.
-- **Logging**: Build a structured logging system that allows multiple logging levels (DEBUG, INFO, WARN, ERROR).
+- **Logging**: Structured logging system that allows multiple logging levels (DEBUG, INFO, WARN, ERROR).
 - **Extensibility**: Add your own components to the server and easily extend its functionality.
 - **Customizable**: Every component is optional and can be replaced with your own implementation.
 
@@ -31,14 +31,13 @@ pip install areion
 ```python
 from areion import AreionServer, DefaultRouter, DefaultOrchestrator
 
+router = DefaultRouter()
+orchestrator = DefaultOrchestrator(max_workers=3)
+
 # Dictionaries are automatically returned as JSON responses
+@router.route("/")
 def home_handler(request):
     return {"msg": "Hello from Areion Server"}
-
-router = DefaultRouter()
-router.add_route("/", home_handler)
-
-orchestrator = DefaultOrchestrator(max_workers=3)
 
 # Build the server with whatever components you want. Nothing is required.
 server = AreionServer()
@@ -132,7 +131,13 @@ class BaseOrchestrator(ABC):
 
 ### Router
 
-The Router is a high-performance component that maps incoming requests to the appropriate handler functions based on the request's path and method. It supports various HTTP methods such as GET, POST, PUT, and DELETE, and allows for easy routing of requests to the appropriate handler functions.
+The Router is a flexible, high-performance component that maps incoming requests to the appropriate handler functions based on the request’s path and method. It supports various HTTP methods (GET, POST, PUT, DELETE), and you can define specific allowed methods per route or even per group of routes.
+
+The Router also supports:
+
+- **Route Groups (Sub-routers):** Organize routes under common prefixes.
+- **Route Decorators:** Define routes more concisely using decorators.
+- **Per-route Method Control:** Specify allowed methods for each route or group.
 
 #### Router Demo
 
@@ -140,41 +145,55 @@ Below is an example demonstrating how to use the Router to define routes, handle
 
 ```python
 
-from areion import AreionServer, DefaultRouter, DefaultEngine
+from areion import AreionServer, DefaultRouter
 
-# Filepath Definitions
-base_dir = os.path.dirname(os.path.abspath(__file__))
-template_dir = os.path.join(base_dir, "templates")
-
-# Component Definitions
 router = DefaultRouter()
-engine = DefaultEngine(template_dir="templates")
 
-# Use a dictionary for easy JSON responses
+# Define handlers
 def home_handler(request):
-    return {"msg": "Hello from Areion Server", "version": "1.0", "status": "OK"}
+    return {"msg": "Welcome to Areion Server", "version": "1.0"}
 
-# Use an engine to render HTML templates with optional variables
-def render_template_handler(request):
-    return engine.render(
-        "index.html",
-        {"title": "Hello from Arion", "message": "Areion is fast."},
-    )
+# Add routes with different allowed methods
+router.add_route("/", home_handler, methods=["GET"])  # Only GET allowed
 
-# Add routes to the router
-router.add_route("/", home_handler)
-router.add_route("/template", render_template_handler)
+# Create a sub-router (group)
+api = router.group("/api")
 
-# Initialize the server with the router and template engine
-server = (
-    AreionServer()
-    .with_router(router)
-    .with_template_engine(engine)
-)
+# You can also use decorators to define routes
+@api.route("/message", methods=["GET"])
+def api_message_handler(request):
+    return {"message": "Hello from the API"}
+
+@api.route("/submit", methods=["POST"])
+def api_submit_handler(request):
+    return {"message": "Data submitted successfully"}
+
+# Initialize the server
+server = AreionServer().with_router(router)
 
 # Start the server
 server.start()
 ```
+
+#### Sub-groups and Method Control
+
+You can easily group routes together and define method restrictions for each group or individual route.
+
+```python
+# Create API sub-router
+api = router.group("/api", allowed_methods=["GET", "POST"])
+
+@api.route("/message", methods=["GET"])
+def api_message_handler(request):
+    return {"message": "Hello from the API"}
+
+@api.route("/submit", methods=["POST"])
+def api_submit_handler(request):
+    return {"message": "Data submitted successfully!"}
+```
+
+- Sub-groups: Organize your routes under common prefixes using group().
+- Method Control: Specify allowed methods per route or group. 
 
 #### Simple API Demo
 
@@ -184,19 +203,17 @@ from areion import AreionServer, DefaultRouter
 router = DefaultRouter()
 
 # Can add any logic, assign tasks to the orchestrator (if defined)
+@router.route("/", methods=["GET"])
 def home_handler(request):
     return {"msg": "Hello from Areion Server", "version": "1.0", "status": "OK"}
 
+@router.route("/about", methods=["GET"])
 def about_handler(request):
     return {"msg": "About Areion Server", "version": "1.0", "status": "OK"}
 
+@router.route("/contact", methods=["GET"])
 def contact_handler(request):
     return {"msg": "Contact Areion Server", "version": "1.0", "status": "OK"}
-
-# Add routes to the router
-router.add_route("/", home_handler)
-router.add_route("/about", about_handler)
-router.add_route("/contact", contact_handler)
 
 # Initialize the server with the router
 server = AreionServer().with_router(router)
@@ -236,14 +253,14 @@ The Logger is a component that provides a structured logging system for the serv
 Below is an example demonstrating how to use the Logger to log messages at different levels:
 
 ```python
-from areion import AreionServer, DefaultLogger
+from areion import AreionServer, DefaultLogger, DefaultRouter
 
 # Initialize the Logger
 logger = DefaultLogger(
     log_file="server.log", log_level="INFO"
 )
 
-server = AreionServer().with_logger(logger)
+server = AreionServer().with_router(DefaultRouter()).with_logger(logger)
 
 # Start the server
 server.start()
