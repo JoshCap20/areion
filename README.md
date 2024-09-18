@@ -16,6 +16,50 @@ Every component (Orchestrator, Router, Logger, etc.) is optional and can be repl
 - **Extensibility**: Add your own components to the server and easily extend its functionality.
 - **Customizable**: Every component is optional and can be replaced with your own implementation.
 
+## Installation
+
+You can install Areion via pip:
+
+```bash
+pip install areion
+```
+
+## Usage Example
+
+### Simple Usage
+
+```python
+from areion import AreionServer, DefaultRouter, DefaultOrchestrator
+
+# Dictionaries are automatically returned as JSON responses
+def home_handler(request):
+    return {"msg": "Hello from Areion Server"}
+
+router = DefaultRouter()
+router.add_route("/", home_handler)
+
+orchestrator = DefaultOrchestrator(max_workers=3)
+
+# Build the server with whatever components you want. Only the router is required.
+server = AreionServer()
+            .with_orchestrator(orchestrator)
+            .with_router(router)
+            .with_port(8000)
+
+# Start the server (also starts the orchestrator and background tasks)
+server.start()
+```
+
+### Minimalist Usage
+
+```python
+from areion import AreionServer
+
+server = AreionServer()
+
+server.start()
+```
+
 ## Components
 
 ### Orchestrator
@@ -27,7 +71,7 @@ The Orchestrator is a centralized component designed to manage tasks such as thr
 Below is an example demonstrating how to use the Orchestrator to schedule and manage tasks:
 
 ```python
-from areion import AreionServer, Orchestrator
+from areion import AreionServer, DefaultOrchestrator
 
 def background_task(task_id, duration):
     print(f"Running background task {task_id} for {duration} seconds.")
@@ -36,7 +80,7 @@ def background_task(task_id, duration):
     return f"Background task {task_id} completed."
 
 # Initialize the Orchestrator
-orchestrator = Orchestrator(max_workers=3)
+orchestrator = DefaultOrchestrator(max_workers=3)
 
 # Schedule a cron task to run every 10 seconds
 orchestrator.schedule_cron_task(
@@ -54,10 +98,28 @@ server.start()
 ```
 
 In this example:
+
 - `background_task` is a function that simulates a background job.
 - `schedule_cron_task` schedules a task to run every 10 seconds.
 - `submit_task` submits tasks to be executed by the Orchestrator.
 - `start` starts the server and the Orchestrator.
+
+#### BaseOrchestrator Interface
+
+```python
+class BaseOrchestrator(ABC):
+    @abstractmethod
+    def submit_task(self, func, *args):
+        pass
+
+    @abstractmethod
+    def schedule_cron_task(self, func, cron_expression, *args):
+        pass
+
+    @abstractmethod
+    def shutdown(self):
+        pass
+```
 
 ### Router
 
@@ -65,67 +127,185 @@ The Router is a high-performance component that maps incoming requests to the ap
 
 #### Router Demo
 
-Below is an example demonstrating how to use the Router to define routes and handle requests:
+Below is an example demonstrating how to use the Router to define routes, handlers, and engine rendering:
 
 ```python
 
-from areion import AreionServer, Router
+from areion import AreionServer, DefaultRouter, DefaultEngine
 
-router = Router()
+# Filepath Definitions
+base_dir = os.path.dirname(os.path.abspath(__file__))
+template_dir = os.path.join(base_dir, "templates")
 
-# Define a route that returns a JSON response
-@router.route("/api/hello")
-def hello_handler(request):
-    return {"message": "Hello, World!"}
+# Component Definitions
+router = DefaultRouter()
+engine = DefaultEngine(template_dir="templates")
 
-
-## Installation
-
-You can install Areion via pip:
-
-```bash
-pip install areion
-```
-
-## Usage Example
-
-### Simple Usage
-
-```python
-from areion import AreionServer, Router, Logger, Orchestrator
-
-# Dictionaries are automatically returned as JSON responses
+# Use a dictionary for easy JSON responses
 def home_handler(request):
-    return {"msg": "Hello from Areion Server"}
+    return {"msg": "Hello from Areion Server", "version": "1.0", "status": "OK"}
 
-router = Router()
+# Use an engine to render HTML templates with optional variables
+def render_template_handler(request):
+    return engine.render(
+        "index.html",
+        {"title": "Hello from Arion", "message": "Areion is fast."},
+    )
+
+# Add routes to the router
 router.add_route("/", home_handler)
+router.add_route("/template", render_template_handler)
 
-orchestrator = DefaultOrchestrator(max_workers=3)
+# Initialize the server with the router and template engine
+server = (
+    AreionServer()
+    .with_router(router)
+    .with_template_engine(engine)
+)
 
-# Build the server with whatever components you want. Only the router is required.
-server = AreionServer()
-            .with_orchestrator(Orchestrator())
-            .with_router(Router())
-            .with_port(8000)
-
-# Start the server (also starts the orchestrator and background tasks)
+# Start the server
 server.start()
 ```
 
-### Minimalist Usage
+#### Simple API Demo
 
 ```python
-from areion import AreionServer
+from areion import AreionServer, DefaultRouter
 
-server = AreionServer()
+router = DefaultRouter()
 
+# Can add any logic, assign tasks to the orchestrator (if defined)
+def home_handler(request):
+    return {"msg": "Hello from Areion Server", "version": "1.0", "status": "OK"}
+
+def about_handler(request):
+    return {"msg": "About Areion Server", "version": "1.0", "status": "OK"}
+
+def contact_handler(request):
+    return {"msg": "Contact Areion Server", "version": "1.0", "status": "OK"}
+
+# Add routes to the router
+router.add_route("/", home_handler)
+router.add_route("/about", about_handler)
+router.add_route("/contact", contact_handler)
+
+# Initialize the server with the router
+server = AreionServer().with_router(router)
+
+# Start the server
 server.start()
 ```
 
-## Documentation
+In this example:
 
-[COMING SOON]
+- `home_handler`, `about_handler`, and `contact_handler` are handler functions that return JSON responses.
+- `add_route` adds routes to the router that map to the appropriate handler functions.
+- `with_router` initializes the server with the router.
+
+#### BaseRouter Interface
+
+```python
+from abc import ABC, abstractmethod
+from typing import Callable, List
+
+class BaseRouter(ABC):
+    @abstractmethod
+    def add_route(self, route: str, handler: Callable, methods: List[str]) -> None:
+        pass
+
+    @abstractmethod
+    def get_handler(self, server: 'AreionServer') -> Callable:
+        pass
+```
+
+### Logger
+
+The Logger is a component that provides a structured logging system for the server. It allows you to log messages at different levels (DEBUG, INFO, WARN, ERROR) and provides a flexible way to customize the logging output. You can easily replace the default logger with your own implementation or add additional loggers to suit your needs.
+
+#### Logger Demo
+
+Below is an example demonstrating how to use the Logger to log messages at different levels:
+
+```python
+from areion import AreionServer, DefaultLogger
+
+# Initialize the Logger
+logger = DefaultLogger(
+    log_file="server.log", log_level="INFO"
+)
+
+server = AreionServer().with_logger(logger)
+
+# Start the server
+server.start()
+```
+
+In this example:
+
+- `DefaultLogger` is a default implementation of the Logger interface.
+- `log_file` specifies the file where log messages will be written.
+- `log_level` specifies the minimum log level to be written to the log file.
+
+#### BaseLogger Interface
+
+```python
+class BaseLogger(ABC):
+    @abstractmethod
+    def info(self, message):
+        pass
+
+    @abstractmethod
+    def error(self, message):
+        pass
+```
+
+### Engine
+
+The Engine is a component that provides a template rendering engine for the server. It allows you to render HTML templates with optional variables and provides a flexible way to customize the rendering process. You can easily replace the default engine with your own implementation or add additional engines to suit your needs.
+
+#### Engine Demo
+
+Below is an example demonstrating how to use the Engine to render HTML templates with optional variables:
+
+```python
+from areion import AreionServer, DefaultEngine, DefaultRouter
+
+# Initialize the Engine and Router
+engine = DefaultEngine(template_dir="templates")
+router = DefaultRouter()
+
+def render_template_handler(request):
+    return engine.render(
+        "index.html",
+        {"title": "Hello from Areion", "message": "Areion is fast."},
+    )
+
+router.add_route("/template", render_template_handler)
+
+server = AreionServer().with_router(router).with_engine(engine)
+
+# Start the server
+server.start()
+```
+
+In this example:
+
+- `DefaultEngine` is a default implementation of the Engine interface.
+- `template_dir` specifies the directory where HTML templates are stored.
+- `render` renders an HTML template with optional variables.
+
+#### BaseEngine Interface
+
+```python
+class BaseEngine(ABC):
+    @abstractmethod
+    def render(self, template_name: str, context: dict):
+        pass
+```
+
+## Contributing
+
+Contributions are welcome! For feature requests, bug reports, or questions, please open an issue. If you would like to contribute code, please open a pull request with your changes.
 
 ## License
 
