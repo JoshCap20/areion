@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from .base import ABC, abstractmethod
 
 
 class BaseOrchestrator(ABC):
