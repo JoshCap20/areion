@@ -23,10 +23,13 @@ class Router:
             router.add_route("/hello", my_handler, methods=["GET", "POST"])
         """
         methods = [method.upper() for method in methods if method.upper() in self.allowed_methods]
-        if path not in self.routes:
-            self.routes[path] = {} 
+        normalized_path = path.rstrip("/") if path != "/" else path
+        if methods == []:
+            raise ValueError("At least one valid HTTP method must be provided per route. Route: " + path)
+        if normalized_path not in self.routes:
+            self.routes[normalized_path] = {} 
         for method in methods:
-            self.routes[path][method] = handler
+            self.routes[normalized_path][method] = handler
 
     def group(self, base_path):
         """
@@ -116,11 +119,10 @@ class Router:
                 self._handle_request("DELETE")
 
             def _handle_request(self, method):
-                route = self.path.rstrip("/")
+                route = self.path.rstrip("/") if self.path != "/" else self.path
                 if route in server.router.routes and method in server.router.routes[route]:
                     handler = server.router.routes[route][method]
                     response = handler(self)
-
                     self._send_response(response)
                 else:
                     self.send_error(404, "Route Not Found")

@@ -12,10 +12,12 @@ class Orchestrator(BaseOrchestrator):
         print("Orchestrator initialized with thread pool of", max_workers, "workers.")
 
     def submit_task(self, func, *args):
+        task_name = getattr(func, "__name__", "unnamed_task")
         future = self.executor.submit(func, *args)
         self.tasks.append(future)
-        print(f"Task {func.__name__} submitted.")
-        
+        print(f"Task {task_name} submitted.")
+        return future
+
     def run_tasks(self):
         print("Running tasks concurrently.")
         for future in as_completed(self.tasks):
@@ -26,10 +28,15 @@ class Orchestrator(BaseOrchestrator):
                 print(f"Task generated an exception: {e}")
 
     def schedule_cron_task(self, func, cron_expression, *args):
-        print(
-            f"Scheduling task {func.__name__} with cron expression: {cron_expression}"
-        )
-        self.scheduler.add_job(func, "cron", *args, id=func.__name__, **cron_expression)
+        if not all(
+            key in ["second", "minute", "hour", "day", "month", "year"]
+            for key in cron_expression
+        ):
+            raise ValueError("Invalid cron expression")
+
+        task_name = getattr(func, "__name__", "unnamed_task")
+        print(f"Scheduling task {task_name} with cron expression: {cron_expression}")
+        self.scheduler.add_job(func, "cron", *args, id=task_name, **cron_expression)
 
     def shutdown(self):
         print("Shutting down Orchestrator...")
