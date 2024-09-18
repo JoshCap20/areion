@@ -15,18 +15,6 @@ Really wish Java interfaces existed, but this is temporary workaround.
 Should we move to a runtime check with a bunch of assertions? Could be better in long term for debugging.
 """
 
-from .base import BaseOrchestrator, BaseLogger, BaseRouter, BaseEngine
-
-"""
-Core web server.
-
-Runs an HTTP server with the provided components.
-
-Validation was added for easier development. Invalid components will be caught on startup.
-Really wish Java interfaces existed, but this is temporary workaround.
-
-Should we move to a runtime check with a bunch of assertions? Could be better in long term for debugging.
-"""
 
 class AreionServer:
     def __init__(self):
@@ -34,20 +22,18 @@ class AreionServer:
         self.router = None
         self.static_dir = None
         self.logger = None
-        self.template_engine = None
+        self.engine = None
         self.port = 8080
 
     def with_orchestrator(self, orchestrator):
-        required_methods = ['submit_task', 'run_tasks', 'shutdown']
-        if not all(hasattr(orchestrator, method) for method in required_methods):
-            raise ValueError("Orchestrator must implement 'submit_task', 'run_tasks', and 'shutdown'.")
+        self._validate_component(
+            orchestrator, ["submit_task", "run_tasks", "shutdown"], "Orchestrator"
+        )
         self.orchestrator = orchestrator
         return self
 
     def with_router(self, router):
-        required_methods = ['add_route', 'get_handler']
-        if not all(hasattr(router, method) for method in required_methods):
-            raise ValueError("Router must implement 'add_route' and 'get_handler'.")
+        self._validate_component(router, ["add_route", "get_handler"], "Router")
         self.router = router
         return self
 
@@ -58,17 +44,13 @@ class AreionServer:
         return self
 
     def with_logger(self, logger):
-        required_methods = ['info', 'error']
-        if not all(hasattr(logger, method) for method in required_methods):
-            raise ValueError("Logger must implement 'info' and 'error'.")
+        self._validate_component(logger, ["info", "error"], "Logger")
         self.logger = logger
         return self
 
-    def with_template_engine(self, template_engine):
-        required_methods = ['render']
-        if not all(hasattr(template_engine, method) for method in required_methods):
-            raise ValueError("Template engine must implement 'render'.")
-        self.template_engine = template_engine
+    def with_engine(self, engine):
+        self._validate_component(engine, ["render"], "Template engine")
+        self.engine = engine
         return self
 
     def with_port(self, port):
@@ -89,24 +71,13 @@ class AreionServer:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
-        if not self.logger:
-            from .default import Logger as DefaultLogger
-
-            self.logger = DefaultLogger()
-            self.logger.info("Logger missing, defaulting to console logging.")
+        self._initialize_logger()
 
         if not self.router:
             self.logger.error("Router missing.")
             return
 
         self.logger.info(f"Starting server on port {self.port}")
-
-        if self.orchestrator:
-            self.logger.info("Orchestrator detected.")
-        else:
-            self.logger.info(
-                "Orchestrator missing, defaulting to single-threaded server."
-            )
 
         if self.static_dir and not os.path.isdir(self.static_dir):
             self.logger.error(f"Static directory {self.static_dir} does not exist.")
@@ -119,16 +90,22 @@ class AreionServer:
             self._run_server()
 
     def _run_server(self):
-        self.logger.info(f"Starting server on port {self.port}")  # type: ignore
-
-        if not self.router:
-            self.logger.error("Router is not set. Starting server without route handling.")  # type: ignore
-            server = HTTPServer(("localhost", self.port), lambda *args, **kwargs: None)  # type: ignore
-        else:
-            server = HTTPServer(("localhost", self.port), self.router.get_handler(self))
-        if not self.orchestrator:
-            self.logger.info("Starting server in single-threaded mode.")  # type: ignore
+        self.logger.info(f"Starting server on port {self.port}")
+        server = HTTPServer(("localhost", self.port), self.router.get_handler(self))
         server.serve_forever()
+
+    def _initialize_logger(self):
+        if not self.logger:
+            from .default import Logger as DefaultLogger
+
+            self.logger = DefaultLogger()
+            self.logger.info("Logger missing, defaulting to console logging.")
+
+    def _validate_component(self, component, required_methods, component_name):
+        if not all(hasattr(component, method) for method in required_methods):
+            raise ValueError(
+                f"{component_name} must implement {', '.join(required_methods)}"
+            )
 
 
 AREION_LOGO = """
