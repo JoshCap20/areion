@@ -40,10 +40,9 @@ def home_handler(request):
     return {"msg": "Hello from Areion Server"}
 
 # Build the server with whatever components you want. Nothing is required.
-server = AreionServer()
-            .with_orchestrator(orchestrator)
-            .with_router(router)
-            .with_port(8000)
+server = (
+    AreionServer().with_orchestrator(orchestrator).with_router(router).with_port(8082)
+)
 
 # Start the server (also starts the orchestrator and background tasks)
 server.start()
@@ -193,7 +192,7 @@ def api_submit_handler(request):
 ```
 
 - Sub-groups: Organize your routes under common prefixes using group().
-- Method Control: Specify allowed methods per route or group. 
+- Method Control: Specify allowed methods per route or group.
 
 #### Simple API Demo
 
