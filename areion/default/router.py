@@ -35,12 +35,14 @@ class Router:
                     handler = server.router.routes[route][method]
                     response = handler(self)
 
-                    if isinstance(response, dict):  # JSON response
+                    if isinstance(response, dict):  
+                        # JSON response
                         self.send_response(200)
                         self.send_header("Content-Type", "application/json")
                         self.end_headers()
                         self.wfile.write(json.dumps(response).encode("utf-8"))
-                    else:  # HTML response
+                    else:  
+                        # HTML response
                         self.send_response(200)
                         self.send_header("Content-Type", "text/html")
                         self.end_headers()

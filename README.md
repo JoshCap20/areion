@@ -40,7 +40,7 @@ router.add_route("/", home_handler)
 
 orchestrator = DefaultOrchestrator(max_workers=3)
 
-# Build the server with whatever components you want. Only the router is required.
+# Build the server with whatever components you want. Nothing is required.
 server = AreionServer()
             .with_orchestrator(orchestrator)
             .with_router(router)
@@ -59,6 +59,8 @@ server = AreionServer()
 
 server.start()
 ```
+
+This won't do anything but run a server on port 8080 by default. You can add routes, orchestrators, loggers, and engines as needed.
 
 ## Components
 
