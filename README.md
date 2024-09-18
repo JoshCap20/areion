@@ -40,7 +40,7 @@ router.add_route("/", home_handler)
 
 orchestrator = DefaultOrchestrator(max_workers=3)
 
-# Build the server with whatever components you want. Only the router is required.
+# Build the server with whatever components you want. Nothing is required.
 server = AreionServer()
             .with_orchestrator(orchestrator)
             .with_router(router)
@@ -53,12 +53,21 @@ server.start()
 ### Minimalist Usage
 
 ```python
-from areion import AreionServer
+from areion import AreionServer, DefaultRouter
 
-server = AreionServer()
+def api_handler(request):
+    x = 5 + 2
+    return {"content": f"5 + 2 = {x}"}
+
+router = DefaultRouter()
+router.add_route("/api", api_handler)
+
+server = AreionServer().with_router(router)
 
 server.start()
 ```
+
+The only required component is a router. This is because... it's a web server. You need to route requests to handlers. Everything else is optional.
 
 ## Components
 
@@ -269,6 +278,11 @@ Below is an example demonstrating how to use the Engine to render HTML templates
 
 ```python
 from areion import AreionServer, DefaultEngine, DefaultRouter
+import os
+
+# Filepath Definitions
+base_dir = os.path.dirname(os.path.abspath(__file__))
+template_dir = os.path.join(base_dir, "templates")
 
 # Initialize the Engine and Router
 engine = DefaultEngine(template_dir="templates")
