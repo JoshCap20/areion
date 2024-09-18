@@ -24,6 +24,8 @@ class Router:
         """
         methods = [method.upper() for method in methods if method.upper() in self.allowed_methods]
         normalized_path = path.rstrip("/") if path != "/" else path
+        if methods == []:
+            raise ValueError("At least one valid HTTP method must be provided per route. Route: " + path)
         if normalized_path not in self.routes:
             self.routes[normalized_path] = {} 
         for method in methods:
