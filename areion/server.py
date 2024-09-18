@@ -3,6 +3,18 @@ import sys
 import signal
 from http.server import HTTPServer
 
+from .base import BaseOrchestrator, BaseLogger, BaseRouter, BaseEngine
+
+"""
+Core web server.
+
+Runs an HTTP server with the provided components.
+
+Validation was added for easier development. Invalid components will be caught on startup.
+Really wish Java interfaces existed, but this is temporary workaround.
+
+Should we move to a runtime check with a bunch of assertions? Could be better in long term for debugging.
+"""
 
 class AreionServer:
     def __init__(self):
@@ -14,26 +26,42 @@ class AreionServer:
         self.port = 8080
 
     def with_orchestrator(self, orchestrator):
+        required_methods = ['submit_task', 'run_tasks', 'shutdown']
+        if not all(hasattr(orchestrator, method) for method in required_methods):
+            raise ValueError("Orchestrator must implement 'submit_task', 'run_tasks', and 'shutdown'.")
         self.orchestrator = orchestrator
         return self
 
     def with_router(self, router):
+        required_methods = ['add_route', 'get_handler']
+        if not all(hasattr(router, method) for method in required_methods):
+            raise ValueError("Router must implement 'add_route' and 'get_handler'.")
         self.router = router
         return self
 
     def with_static_dir(self, static_dir):
+        if not isinstance(static_dir, str):
+            raise ValueError("Static directory must be a string.")
         self.static_dir = static_dir
         return self
 
     def with_logger(self, logger):
+        required_methods = ['info', 'error']
+        if not all(hasattr(logger, method) for method in required_methods):
+            raise ValueError("Logger must implement 'info' and 'error'.")
         self.logger = logger
         return self
 
     def with_template_engine(self, template_engine):
+        required_methods = ['render']
+        if not all(hasattr(template_engine, method) for method in required_methods):
+            raise ValueError("Template engine must implement 'render'.")
         self.template_engine = template_engine
         return self
 
     def with_port(self, port):
+        if not isinstance(port, int):
+            raise ValueError("Port must be an integer.")
         self.port = port
         return self
 
