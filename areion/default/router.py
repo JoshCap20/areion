@@ -15,14 +15,18 @@ class Router:
             path (str): The URL path for the route.
             handler (callable): The function to handle requests to the route.
             methods (list, optional): A list of HTTP methods that the route should respond to. Defaults to ["GET"].
-            
+
         Example:
             def my_handler(request):
                 return "Hello, world!"
 
             router.add_route("/hello", my_handler, methods=["GET", "POST"])
         """
-        methods = [method.upper() for method in methods if method.upper() in self.allowed_methods]
+        methods = [
+            method.upper()
+            for method in methods
+            if method.upper() in self.allowed_methods
+        ]
         normalized_path = path.rstrip("/") if path != "/" else path
 
         if not methods:
@@ -71,6 +75,7 @@ class Router:
         Returns:
             function: The decorated function with the route added.
         """
+
         def decorator(func):
             self.add_route(path, func, methods)
             return func

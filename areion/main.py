@@ -1,7 +1,7 @@
 import os
 import asyncio
 import threading
-from .core import HttpServer
+from .core import HttpServer, HttpRequestFactory
 
 # Constants
 DEFAULT_PORT = 8080
@@ -37,6 +37,7 @@ class AreionServer:
         self.loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
         self._shutdown_event: asyncio.Event = asyncio.Event()
         self.http_server: HttpServer | None = None
+        self.request_factory = None
 
     def with_orchestrator(self, orchestrator) -> "AreionServer":
         self._validate_component(
@@ -105,18 +106,18 @@ class AreionServer:
             self.logger.error("Router missing.")
             return
 
-        self.logger.info(f"Starting server on port {self.port}")
+        self.logger.info(f"Starting server on {self.host}:{self.port}")
 
-        # Start orchestrator tasks in a separate thread
-        if self.orchestrator:
-            orchestrator_thread = threading.Thread(
-                target=self._start_orchestrator, daemon=True
-            )
-            orchestrator_thread.start()
+        self._start_orchestrator_in_thread()
+        self._initialize_request_factory()
 
         # Add the HTTP Server
+        # TODO: Could pass logger here
         self.http_server = HttpServer(
-            router=self.router, host=self.host, port=self.port
+            router=self.router,
+            host=self.host,
+            port=self.port,
+            request_factory=self.request_factory,
         )
 
         # TODO: Attach static file handler here
@@ -128,7 +129,7 @@ class AreionServer:
 
         self.logger.info(f"Server running on http://{self.host}:{self.port}")
         self.logger.debug("Press Ctrl+C to stop the server.")
-        self.logger.debug(f"Available Routes and Handlers: {self.router.routes}")
+        self.logger.info(f"Available Routes and Handlers: {self.router.routes}")
 
         # Wait for shutdown signal
         await self._shutdown_event.wait()
@@ -165,6 +166,14 @@ class AreionServer:
         self.logger.info("Shutdown initiated.")
         self.loop.call_soon_threadsafe(self._shutdown_event.set)
 
+    def _start_orchestrator_in_thread(self):
+        """Start orchestrator tasks in a separate thread"""
+        if self.orchestrator:
+            orchestrator_thread = threading.Thread(
+                target=self._start_orchestrator, daemon=True
+            )
+            orchestrator_thread.start()
+
     def _start_orchestrator(self):
         if self.orchestrator:
             self.logger.info("Starting orchestrator...")
@@ -186,5 +195,14 @@ class AreionServer:
                 f"{component_name} must implement {', '.join(required_methods)}"
             )
 
+    def initialize_request_factory(self):
+        """
+        Initialize the HttpRequestFactory with the orchestrator, logger, and engine.
+        """
+        self.request_factory = HttpRequestFactory(
+            logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
+        )
+
     def _serve_static_files(self):
+        # TODO: Implement serving static files
         raise NotImplementedError("Serving static files is not yet implemented.")
