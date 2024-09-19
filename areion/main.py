@@ -1,7 +1,7 @@
 import os
 import asyncio
 import threading
-from .core import HttpServer
+from .core import HttpServer, HttpRequestFactory
 
 # Constants
 DEFAULT_PORT = 8080
@@ -118,6 +118,8 @@ class AreionServer:
         self.http_server = HttpServer(
             router=self.router, host=self.host, port=self.port
         )
+        
+        self.initialize_request_factory()
 
         # TODO: Attach static file handler here
         if self.static_dir:
@@ -128,7 +130,7 @@ class AreionServer:
 
         self.logger.info(f"Server running on http://{self.host}:{self.port}")
         self.logger.debug("Press Ctrl+C to stop the server.")
-        self.logger.debug(f"Available Routes and Handlers: {self.router.routes}")
+        self.logger.info(f"Available Routes and Handlers: {self.router.routes}")
 
         # Wait for shutdown signal
         await self._shutdown_event.wait()
@@ -185,6 +187,17 @@ class AreionServer:
             raise ValueError(
                 f"{component_name} must implement {', '.join(required_methods)}"
             )
+            
+    def initialize_request_factory(self):
+        """
+        Initialize the HttpRequestFactory with the orchestrator, logger, and engine.
+        """
+        self.request_factory = HttpRequestFactory(
+            logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
+        )
+
 
     def _serve_static_files(self):
+        # TODO: Implement serving static files
         raise NotImplementedError("Serving static files is not yet implemented.")
+    

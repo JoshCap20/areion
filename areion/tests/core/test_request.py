@@ -1,5 +1,7 @@
 import unittest
-from areion.core import HttpRequest
+from unittest.mock import Mock
+from areion.core import HttpRequest, HttpRequestFactory
+
 
 class TestHttpRequest(unittest.TestCase):
 
@@ -41,7 +43,7 @@ class TestHttpRequest(unittest.TestCase):
             "method": self.method,
             "path": self.path,
             "headers": self.headers,
-            "metadata": {}
+            "metadata": {},
         }
         self.assertEqual(self.request.as_dict(), expected_dict)
 
@@ -91,6 +93,92 @@ class TestHttpRequest(unittest.TestCase):
         special_value = "Value!@#$%^&*()_+"
         self.request.add_metadata(special_key, special_value)
         self.assertEqual(self.request.get_metadata(special_key), special_value)
+
+    def test_render_template(self):
+        mock_engine = Mock()
+        mock_engine.render.return_value = "Rendered Content"
+        self.request.engine = mock_engine
+        result = self.request.render_template("template.html", {"key": "value"})
+        self.assertEqual(result, "Rendered Content")
+        mock_engine.render.assert_called_once_with("template.html", {"key": "value"})
+
+    def test_render_template_no_engine(self):
+        self.request.engine = None
+        result = self.request.render_template("template.html")
+        self.assertIsNone(result)
+
+    def test_submit_task(self):
+        mock_orchestrator = Mock()
+        mock_orchestrator.submit_task.return_value = "Task Submitted"
+        self.request.orchestrator = mock_orchestrator
+        result = self.request.submit_task("task_name", "arg1", "arg2")
+        self.assertEqual(result, "Task Submitted")
+        mock_orchestrator.submit_task.assert_called_once_with(
+            "task_name", "arg1", "arg2"
+        )
+
+    def test_submit_task_no_orchestrator(self):
+        self.request.orchestrator = None
+        with self.assertRaises(ValueError) as context:
+            self.request.submit_task("task_name")
+        self.assertEqual(
+            str(context.exception), "No orchestrator available to submit the task."
+        )
+
+    def test_log(self):
+        mock_logger = Mock()
+        self.request.logger = mock_logger
+        self.request.log("Test message", "info")
+        mock_logger.info.assert_called_once_with("Test message")
+
+    def test_log_no_logger(self):
+        self.request.logger = None
+        self.request.log("Test message", "info")  # Should not raise an exception
+
+
+class TestHttpRequestFactory(unittest.TestCase):
+
+    def setUp(self):
+        self.logger = Mock()
+        self.engine = Mock()
+        self.orchestrator = Mock()
+        self.factory = HttpRequestFactory(
+            logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
+        )
+
+    def test_create(self):
+        method = "POST"
+        path = "/create"
+        headers = {"Authorization": "Bearer token"}
+        request = self.factory.create(method, path, headers)
+        self.assertEqual(request.method, method)
+        self.assertEqual(request.path, path)
+        self.assertEqual(request.headers, headers)
+        self.assertEqual(request.logger, self.logger)
+        self.assertEqual(request.engine, self.engine)
+        self.assertEqual(request.orchestrator, self.orchestrator)
+
+    def test_create_no_logger(self):
+        factory = HttpRequestFactory(engine=self.engine, orchestrator=self.orchestrator)
+        request = factory.create("GET", "/path", {})
+        self.assertIsNone(request.logger)
+        self.assertEqual(request.engine, self.engine)
+        self.assertEqual(request.orchestrator, self.orchestrator)
+
+    def test_create_no_engine(self):
+        factory = HttpRequestFactory(logger=self.logger, orchestrator=self.orchestrator)
+        request = factory.create("GET", "/path", {})
+        self.assertEqual(request.logger, self.logger)
+        self.assertIsNone(request.engine)
+        self.assertEqual(request.orchestrator, self.orchestrator)
+
+    def test_create_no_orchestrator(self):
+        factory = HttpRequestFactory(logger=self.logger, engine=self.engine)
+        request = factory.create("GET", "/path", {})
+        self.assertEqual(request.logger, self.logger)
+        self.assertEqual(request.engine, self.engine)
+        self.assertIsNone(request.orchestrator)
+
 
 if __name__ == "__main__":
     unittest.main()

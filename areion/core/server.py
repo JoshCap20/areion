@@ -4,7 +4,7 @@ from .request import HttpRequest
 
 
 class HttpServer:
-    def __init__(self, router, host: str = "localhost", port: int = 8080):
+    def __init__(self, router, request_factory, host: str = "localhost", port: int = 8080):
         if not isinstance(port, int):
             raise ValueError("Port must be an integer.")
         if not isinstance(host, str):
@@ -12,6 +12,7 @@ class HttpServer:
         if not router:
             raise ValueError("Router must be provided.")
         self.router = router
+        self.request_factory = request_factory
         self.host = host
         self.port = port
         self._shutdown_event = asyncio.Event()
@@ -38,7 +39,7 @@ class HttpServer:
                 headers[header_name] = header_value
 
             # Create request object
-            request = HttpRequest(method, path, headers)
+            request = self.request_factory.create(method, path, headers)
             handler, path_params = self.router.get_handler(method, path)
 
             if handler:
