@@ -26,64 +26,28 @@ AREION_LOGO = """
 
 
 class AreionServer:
-    def __init__(self):
-        self.orchestrator: any | None = None
-        self.router: any | None = None
-        self.static_dir: str | None = None
-        self.logger: any | None = None
-        self.engine: any | None = None
-        self.host: str = DEFAULT_HOST
-        self.port: int = DEFAULT_PORT
+    def __init__(
+        self,
+        host=DEFAULT_HOST,
+        port=DEFAULT_PORT,
+        router=None,
+        orchestrator=None,
+        logger=None,
+        engine=None,
+        static_dir=None,
+        request_factory=None,
+    ):
+        self.orchestrator: any | None = orchestrator
+        self.router: any | None = router
+        self.static_dir: str | None = static_dir
+        self.logger: any | None = logger
+        self.engine: any | None = engine
+        self.host: str = host
+        self.port: int = port
         self.loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
         self._shutdown_event: asyncio.Event = asyncio.Event()
         self.http_server: HttpServer | None = None
-        self.request_factory = None
-
-    def with_orchestrator(self, orchestrator) -> "AreionServer":
-        self._validate_component(
-            orchestrator,
-            ["start", "submit_task", "run_tasks", "shutdown"],
-            "Orchestrator",
-        )
-        self.orchestrator = orchestrator
-        return self
-
-    def with_router(self, router) -> "AreionServer":
-        self._validate_component(router, ["add_route", "get_handler"], "Router")
-        self.router = router
-        return self
-
-    def with_static_dir(self, static_dir) -> "AreionServer":
-        if not isinstance(static_dir, str):
-            raise ValueError("Static directory must be a string.")
-        if not os.path.isdir(static_dir):
-            raise ValueError(f"Static directory {static_dir} does not exist.")
-        self.static_dir = static_dir
-        return self
-
-    def with_logger(self, logger) -> "AreionServer":
-        self._validate_component(logger, ["info", "error", "debug"], "Logger")
-        self.logger = logger
-        return self
-
-    def with_engine(self, engine):
-        self._validate_component(engine, ["render"], "Template engine")
-        self.engine = engine
-        return self
-
-    def with_port(self, port: int) -> "AreionServer":
-        if not isinstance(port, int):
-            raise ValueError("Port must be an integer.")
-        self.port = port
-        # TODO: add more validation
-        return self
-
-    def with_host(self, host: str) -> "AreionServer":
-        if not isinstance(host, str):
-            raise ValueError("Host must be a string.")
-        # TODO: add more validation
-        self.host = host
-        return self
+        self.request_factory = request_factory
 
     def run(self) -> None:
         """
@@ -109,7 +73,6 @@ class AreionServer:
         self.logger.info(f"Starting server on {self.host}:{self.port}")
 
         self._start_orchestrator_in_thread()
-        self._initialize_request_factory()
 
         # Add the HTTP Server
         # TODO: Could pass logger here
@@ -189,20 +152,86 @@ class AreionServer:
             self.logger = DefaultLogger()
             self.logger.info("Logger missing, defaulting to console logging.")
 
+    def _serve_static_files(self):
+        # TODO: Implement serving static files
+        raise NotImplementedError("Serving static files is not yet implemented.")
+
+
+class AreionServerBuilder:
+    def __init__(self):
+        self.host = DEFAULT_HOST
+        self.port = DEFAULT_PORT
+        self.router = None
+        self.orchestrator = None
+        self.logger = None
+        self.engine = None
+        self.static_dir = None
+
+    def with_host(self, host: str):
+        if not isinstance(host, str):
+            raise ValueError("Host must be a string.")
+        self.host = host
+        return self
+
+    def with_port(self, port: int):
+        if not isinstance(port, int):
+            raise ValueError("Port must be an integer.")
+        self.port = port
+        return self
+
+    def with_router(self, router):
+        self._validate_component(router, ["add_route", "get_handler"], "Router")
+        self.router = router
+        return self
+
+    def with_orchestrator(self, orchestrator):
+        self._validate_component(
+            orchestrator,
+            ["start", "submit_task", "run_tasks", "shutdown"],
+            "Orchestrator",
+        )
+        self.orchestrator = orchestrator
+        return self
+
+    def with_logger(self, logger):
+        self._validate_component(logger, ["info", "error", "debug"], "Logger")
+        self.logger = logger
+        return self
+
+    def with_engine(self, engine):
+        self._validate_component(engine, ["render"], "Template engine")
+        self.engine = engine
+        return self
+
+    def with_static_dir(self, static_dir: str):
+        if not isinstance(static_dir, str):
+            raise ValueError("Static directory must be a string.")
+        if not os.path.isdir(static_dir):
+            raise ValueError(f"Static directory {static_dir} does not exist.")
+        self.static_dir = static_dir
+        return self
+    
     def _validate_component(self, component, required_methods, component_name):
         if not all(hasattr(component, method) for method in required_methods):
             raise ValueError(
                 f"{component_name} must implement {', '.join(required_methods)}"
             )
 
-    def initialize_request_factory(self):
-        """
-        Initialize the HttpRequestFactory with the orchestrator, logger, and engine.
-        """
-        self.request_factory = HttpRequestFactory(
+    def build(self):
+        if not self.router:
+            raise ValueError("Router is required.")
+
+        request_factory = HttpRequestFactory(
             logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
         )
 
-    def _serve_static_files(self):
-        # TODO: Implement serving static files
-        raise NotImplementedError("Serving static files is not yet implemented.")
+        return AreionServer(
+            host=self.host,
+            port=self.port,
+            router=self.router,
+            orchestrator=self.orchestrator,
+            logger=self.logger,
+            engine=self.engine,
+            static_dir=self.static_dir,
+            request_factory=request_factory,
+        )
