@@ -3,6 +3,10 @@ from .base import ABC, abstractmethod
 
 class BaseOrchestrator(ABC):
     @abstractmethod
+    def start(self):
+        pass
+
+    @abstractmethod
     def submit_task(self, func, *args):
         pass
 

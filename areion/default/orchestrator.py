@@ -8,9 +8,13 @@ class Orchestrator(BaseOrchestrator):
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.tasks = []
         self.scheduler = BackgroundScheduler()
-        self.scheduler.start()
         print("Orchestrator initialized with thread pool of", max_workers, "workers.")
 
+    def start(self):
+        print("Orchestrator running.")
+        self.scheduler.start()
+        self.run_tasks() # Run any pending tasks immediately
+        
     def submit_task(self, func, *args):
         task_name = getattr(func, "__name__", "unnamed_task")
         future = self.executor.submit(func, *args)
