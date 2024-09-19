@@ -2,7 +2,7 @@ import json
 
 
 class HttpResponse:
-    def __init__(self, body=None, status_code=200, content_type=None):
+    def __init__(self, body=None, status_code=200, content_type=None, headers=None):
         """
         Initializes the HttpResponse object.
 
@@ -10,10 +10,14 @@ class HttpResponse:
             body (any): The response body, which could be a dict (for JSON), string (for HTML/text), or bytes (for files).
             status_code (int): The HTTP status code.
             content_type (str, optional): The content type (e.g., "application/json"). If not specified, it will be inferred from the body type.
+            headers (dict, optional): Additional headers to include in the response.
         """
         self.status_code = status_code
         self.body = body
         self.content_type = content_type or self._infer_content_type(body)
+        self.headers = headers or {}
+        self.headers.setdefault("Content-Type", self.content_type)
+        self.headers.setdefault("Content-Length", str(len(self._format_body())))
 
     def _infer_content_type(self, body):
         """
@@ -59,6 +63,7 @@ class HttpResponse:
         """
         body = self._format_body()
         response_line = f"HTTP/1.1 {self.status_code} OK\r\n"
-        headers = f"Content-Type: {self.content_type}\r\n"
-        headers += f"Content-Length: {len(body)}\r\n"
+        headers = ''.join(f"{key}: {value}\r\n" for key, value in self.headers.items())
+        response = (response_line + headers + "\r\n").encode("utf-8") + body
+        print(response)
         return (response_line + headers + "\r\n").encode("utf-8") + body
