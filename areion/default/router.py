@@ -24,10 +24,16 @@ class Router:
         """
         methods = [method.upper() for method in methods if method.upper() in self.allowed_methods]
         normalized_path = path.rstrip("/") if path != "/" else path
-        if methods == []:
-            raise ValueError("At least one valid HTTP method must be provided per route. Route: " + path)
+
+        if not methods:
+            raise ValueError(
+                "At least one valid HTTP method must be provided per route. Route: "
+                + path
+            )
+
         if normalized_path not in self.routes:
-            self.routes[normalized_path] = {} 
+            self.routes[normalized_path] = {}
+
         for method in methods:
             self.routes[normalized_path][method] = handler
 
@@ -68,83 +74,25 @@ class Router:
         def decorator(func):
             self.add_route(path, func, methods)
             return func
+
         return decorator
 
-    def get_handler(self, server):
+    def get_handler(self, method, path):
         """
-        Returns a request handler class for the given server.
-
-        The returned RequestHandler class inherits from BaseHTTPRequestHandler and 
-        handles HTTP GET, POST, PUT, and DELETE requests. It routes the requests 
-        to the appropriate handler based on the server's routing table.
-
-        Methods:
-            do_GET(self):
-                Handles HTTP GET requests.
-            
-            do_POST(self):
-                Handles HTTP POST requests.
-            
-            do_PUT(self):
-                Handles HTTP PUT requests.
-            
-            do_DELETE(self):
-                Handles HTTP DELETE requests.
-            
-            _handle_request(self, method):
-                Routes the request to the appropriate handler based on the method 
-                and the request path. Sends a 404 error if the route is not found.
-            
-            _send_response(self, response):
-                Sends the response to the client. Supports JSON, HTML, plain text, 
-                and binary data responses. Sends a 500 error for unsupported response types.
+        Get the appropriate route handler based on the HTTP method and path.
 
         Args:
-            server: The server instance that contains the routing table.
+            method (str): The HTTP method of the request (e.g., "GET", "POST").
+            path (str): The request path (e.g., "/hello").
 
         Returns:
-            RequestHandler: A class that handles HTTP requests for the given server.
+            tuple: (handler, path_params) if a route is matched; otherwise (None, None).
         """
-        class RequestHandler(BaseHTTPRequestHandler):
-            def do_GET(self):
-                self._handle_request("GET")
+        normalized_path = path.rstrip("/") if path != "/" else path
 
-            def do_POST(self):
-                self._handle_request("POST")
-
-            def do_PUT(self):
-                self._handle_request("PUT")
-
-            def do_DELETE(self):
-                self._handle_request("DELETE")
-
-            def _handle_request(self, method):
-                route = self.path.rstrip("/") if self.path != "/" else self.path
-                if route in server.router.routes and method in server.router.routes[route]:
-                    handler = server.router.routes[route][method]
-                    response = handler(self)
-                    self._send_response(response)
-                else:
-                    self.send_error(404, "Route Not Found")
-
-            def _send_response(self, response):
-                if isinstance(response, dict):  # JSON response
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps(response).encode("utf-8"))
-                elif isinstance(response, str):  # HTML or plain text
-                    content_type = "text/html" if "<html" in response else "text/plain"
-                    self.send_response(200)
-                    self.send_header("Content-Type", content_type)
-                    self.end_headers()
-                    self.wfile.write(response.encode("utf-8"))
-                elif isinstance(response, bytes):  # Binary data
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/octet-stream")
-                    self.end_headers()
-                    self.wfile.write(response)
-                else:
-                    self.send_error(500, "Unsupported response type")
-
-        return RequestHandler
+        if normalized_path in self.routes and method in self.routes[normalized_path]:
+            handler = self.routes[normalized_path][method]
+            # TODO: Extract parameters
+            path_params = {}
+            return handler, path_params
+        return None, None

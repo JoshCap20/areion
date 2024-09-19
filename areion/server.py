@@ -1,112 +1,11 @@
 import os
-import sys
-import signal
-from http.server import HTTPServer
+import asyncio
+import threading
+from .core import HttpServer
 
-
-"""
-Core web server.
-
-Runs an HTTP server with the provided components.
-
-Validation was added for easier development. Invalid components will be caught on startup.
-Really wish Java interfaces existed, but this is temporary workaround.
-
-Should we move to a runtime check with a bunch of assertions? Could be better in long term for debugging.
-"""
-
-class AreionServer:
-    def __init__(self):
-        self.orchestrator = None
-        self.router = None
-        self.static_dir = None
-        self.logger = None
-        self.engine = None
-        self.port = 8080
-
-    def with_orchestrator(self, orchestrator):
-        self._validate_component(
-            orchestrator, ["submit_task", "run_tasks", "shutdown"], "Orchestrator"
-        )
-        self.orchestrator = orchestrator
-        return self
-
-    def with_router(self, router):
-        self._validate_component(router, ["add_route", "get_handler"], "Router")
-        self.router = router
-        return self
-
-    def with_static_dir(self, static_dir):
-        if not isinstance(static_dir, str):
-            raise ValueError("Static directory must be a string.")
-        self.static_dir = static_dir
-        return self
-
-    def with_logger(self, logger):
-        self._validate_component(logger, ["info", "error"], "Logger")
-        self.logger = logger
-        return self
-
-    def with_engine(self, engine):
-        self._validate_component(engine, ["render"], "Template engine")
-        self.engine = engine
-        return self
-
-    def with_port(self, port):
-        if not isinstance(port, int):
-            raise ValueError("Port must be an integer.")
-        self.port = port
-        return self
-
-    def start(self):
-        print(AREION_LOGO)
-
-        def signal_handler(sig, frame):
-            print("Received shutdown signal. Shutting down server...")
-            if self.orchestrator:
-                self.orchestrator.shutdown()
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-
-        self._initialize_logger()
-
-        if not self.router:
-            self.logger.error("Router missing.")
-            return
-
-        self.logger.info(f"Starting server on port {self.port}")
-
-        if self.static_dir and not os.path.isdir(self.static_dir):
-            self.logger.error(f"Static directory {self.static_dir} does not exist.")
-            return
-
-        if self.orchestrator:
-            self.orchestrator.submit_task(self._run_server)
-            self.orchestrator.run_tasks()
-        else:
-            self._run_server()
-
-    def _run_server(self):
-        self.logger.info(f"Starting server on port {self.port}")
-        server = HTTPServer(("localhost", self.port), self.router.get_handler(self))
-        server.serve_forever()
-
-    def _initialize_logger(self):
-        if not self.logger:
-            from .default import Logger as DefaultLogger
-
-            self.logger = DefaultLogger()
-            self.logger.info("Logger missing, defaulting to console logging.")
-
-    def _validate_component(self, component, required_methods, component_name):
-        if not all(hasattr(component, method) for method in required_methods):
-            raise ValueError(
-                f"{component_name} must implement {', '.join(required_methods)}"
-            )
-
-
+# Constants
+DEFAULT_PORT = 8080
+DEFAULT_HOST = "localhost"
 AREION_LOGO = """
            >>\\.
           /_  )`.
@@ -124,3 +23,168 @@ AREION_LOGO = """
       |_|_|________________________|_|_|
       \\_\\_\\                        /_/_/
 """
+
+
+class AreionServer:
+    def __init__(self):
+        self.orchestrator: any | None = None
+        self.router: any | None = None
+        self.static_dir: str | None = None
+        self.logger: any | None = None
+        self.engine: any | None = None
+        self.host: str = DEFAULT_HOST
+        self.port: int = DEFAULT_PORT
+        self.loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
+        self._shutdown_event: asyncio.Event = asyncio.Event()
+        self.http_server: HttpServer | None = None
+
+    def with_orchestrator(self, orchestrator) -> "AreionServer":
+        self._validate_component(
+            orchestrator,
+            ["start", "submit_task", "run_tasks", "shutdown"],
+            "Orchestrator",
+        )
+        self.orchestrator = orchestrator
+        return self
+
+    def with_router(self, router) -> "AreionServer":
+        self._validate_component(router, ["add_route", "get_handler"], "Router")
+        self.router = router
+        return self
+
+    def with_static_dir(self, static_dir) -> "AreionServer":
+        if not isinstance(static_dir, str):
+            raise ValueError("Static directory must be a string.")
+        if not os.path.isdir(static_dir):
+            raise ValueError(f"Static directory {static_dir} does not exist.")
+        self.static_dir = static_dir
+        return self
+
+    def with_logger(self, logger) -> "AreionServer":
+        self._validate_component(logger, ["info", "error", "debug"], "Logger")
+        self.logger = logger
+        return self
+
+    def with_engine(self, engine):
+        self._validate_component(engine, ["render"], "Template engine")
+        self.engine = engine
+        return self
+
+    def with_port(self, port: int) -> "AreionServer":
+        if not isinstance(port, int):
+            raise ValueError("Port must be an integer.")
+        self.port = port
+        # TODO: add more validation
+        return self
+
+    def with_host(self, host: str) -> "AreionServer":
+        if not isinstance(host, str):
+            raise ValueError("Host must be a string.")
+        # TODO: add more validation
+        self.host = host
+        return self
+
+    def run(self) -> None:
+        """
+        Start the server synchronously. This is a simplified entry point for users
+        to start the server without dealing with asyncio directly.
+        """
+        try:
+            asyncio.run(self.start())
+        except (KeyboardInterrupt, SystemExit):
+            self.stop()
+
+    async def start(self) -> None:
+        """
+        Start the Areion server asynchronously
+        """
+        print(AREION_LOGO)
+        self._initialize_logger()
+
+        if not self.router:
+            self.logger.error("Router missing.")
+            return
+
+        self.logger.info(f"Starting server on port {self.port}")
+
+        # Start orchestrator tasks in a separate thread
+        if self.orchestrator:
+            orchestrator_thread = threading.Thread(
+                target=self._start_orchestrator, daemon=True
+            )
+            orchestrator_thread.start()
+
+        # Add the HTTP Server
+        self.http_server = HttpServer(
+            router=self.router, host=self.host, port=self.port
+        )
+
+        # TODO: Attach static file handler here
+        if self.static_dir:
+            self._serve_static_files()
+
+        # Start the HTTP server
+        server_task = asyncio.create_task(self.http_server.start())
+
+        self.logger.info(f"Server running on http://{self.host}:{self.port}")
+        self.logger.debug("Press Ctrl+C to stop the server.")
+        self.logger.debug(f"Available Routes and Handlers: {self.router.routes}")
+
+        # Wait for shutdown signal
+        await self._shutdown_event.wait()
+
+        self.logger.info("Shutting down server...")
+        await self.shutdown(server_task)
+        self.logger.info("Server shutdown complete.")
+
+    async def shutdown(self, server_task):
+        """
+        Gracefully shutdown the server.
+        """
+        # Trigger the HTTP server to stop
+        if self.http_server:
+            await self.http_server.stop()
+
+        # Wait for the HTTP server to finish
+        await server_task
+
+        # Shutdown orchestrator
+        if self.orchestrator:
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, self.orchestrator.shutdown
+                )
+                self.logger.info("Orchestrator shutdown complete.")
+            except Exception as e:
+                self.logger.error(f"Error during orchestrator shutdown: {e}")
+
+    def stop(self):
+        """
+        Initiate server shutdown.
+        """
+        self.logger.info("Shutdown initiated.")
+        self.loop.call_soon_threadsafe(self._shutdown_event.set)
+
+    def _start_orchestrator(self):
+        if self.orchestrator:
+            self.logger.info("Starting orchestrator...")
+            try:
+                self.orchestrator.start()
+            except Exception as e:
+                self.logger.error(f"Orchestrator error: {e}")
+
+    def _initialize_logger(self) -> None:
+        if not self.logger:
+            from .default import Logger as DefaultLogger
+
+            self.logger = DefaultLogger()
+            self.logger.info("Logger missing, defaulting to console logging.")
+
+    def _validate_component(self, component, required_methods, component_name):
+        if not all(hasattr(component, method) for method in required_methods):
+            raise ValueError(
+                f"{component_name} must implement {', '.join(required_methods)}"
+            )
+
+    def _serve_static_files(self):
+        raise NotImplementedError("Serving static files is not yet implemented.")
