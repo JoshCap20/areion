@@ -2,7 +2,6 @@ import unittest
 from unittest.mock import Mock, patch
 from areion.default import Orchestrator
 from concurrent.futures import ThreadPoolExecutor
-import time
 
 class TestOrchestrator(unittest.TestCase):
 
