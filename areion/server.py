@@ -1,28 +1,42 @@
 import os
 import sys
 import signal
+import threading
 from http.server import HTTPServer
 
 
+# Constants
+DEFAULT_PORT = 8080
+AREION_LOGO = """
+           >>\\.
+          /_  )`.
+         /  _)`^)`.   _.---. _ 
+        (_,' \\  `^-)""      `.\\
+              |           | \\ \\--._
+             /   /  /     | | |
+            /   /  /      | | |
+        ___/___/__/_______|_|__\\______
+       /                              \\
+      /         A R E I O N            \\
+     /__________________________________\\
+      | | |                        | | |
+      | | |                        | | |
+      |_|_|________________________|_|_|
+      \\_\\_\\                        /_/_/
 """
-Core web server.
 
-Runs an HTTP server with the provided components.
-
-Validation was added for easier development. Invalid components will be caught on startup.
-Really wish Java interfaces existed, but this is temporary workaround.
-
-Should we move to a runtime check with a bunch of assertions? Could be better in long term for debugging.
-"""
 
 class AreionServer:
     def __init__(self):
-        self.orchestrator = None
-        self.router = None
-        self.static_dir = None
-        self.logger = None
-        self.engine = None
-        self.port = 8080
+        self.orchestrator: any | None = None
+        self.router: any | None = None
+        self.static_dir: str | None = None
+        self.logger: any | None = None
+        self.engine: any | None = None
+        self.port: int = DEFAULT_PORT
+        self.server: HTTPServer | None = None
+        self._server_thread: threading.Thread | None = None
+        self._lock = threading.Lock()
 
     def with_orchestrator(self, orchestrator):
         self._validate_component(
@@ -52,13 +66,13 @@ class AreionServer:
         self.engine = engine
         return self
 
-    def with_port(self, port):
+    def with_port(self, port: int) -> 'AreionServer':
         if not isinstance(port, int):
             raise ValueError("Port must be an integer.")
         self.port = port
         return self
 
-    def start(self):
+    def start(self, in_thread: bool = False) -> None:
         print(AREION_LOGO)
 
         def signal_handler(sig, frame):
@@ -86,14 +100,37 @@ class AreionServer:
             self.orchestrator.submit_task(self._run_server)
             self.orchestrator.run_tasks()
         else:
-            self._run_server()
+            if in_thread:
+                self._start_in_thread()
+            else:
+                self._run_server()
 
-    def _run_server(self):
-        self.logger.info(f"Starting server on port {self.port}")
-        server = HTTPServer(("localhost", self.port), self.router.get_handler(self))
-        server.serve_forever()
+    def _run_server(self) -> None:
+        with self._lock:
+            self.logger.info(f"Starting server on port {self.port}")
+            try:
+                self.server = HTTPServer(("localhost", self.port), self.router.get_handler(self))
+                self.server.serve_forever()
+            except Exception as e:
+                self.logger.error(f"Failed to start server: {e}")
+                raise
 
-    def _initialize_logger(self):
+    def _start_in_thread(self) -> None:
+        with self._lock:
+            self._server_thread = threading.Thread(target=self._run_server)
+            self._server_thread.daemon = True
+            self._server_thread.start()
+            self.logger.info(f"Server running in thread on port {self.port}")
+        
+    def stop(self):
+        if self.server:
+            self.logger.info("Shutting down server...")
+            self.server.shutdown()  # Gracefully shutdown server
+        if self._server_thread:
+            self._server_thread.join()
+            self.logger.info("Server thread has terminated.")
+
+    def _initialize_logger(self) -> None:
         if not self.logger:
             from .default import Logger as DefaultLogger
 
@@ -107,20 +144,3 @@ class AreionServer:
             )
 
 
-AREION_LOGO = """
-           >>\\.
-          /_  )`.
-         /  _)`^)`.   _.---. _ 
-        (_,' \\  `^-)""      `.\\
-              |           | \\ \\--._
-             /   /  /     | | |
-            /   /  /      | | |
-        ___/___/__/_______|_|__\\______
-       /                              \\
-      /         A R E I O N            \\
-     /__________________________________\\
-      | | |                        | | |
-      | | |                        | | |
-      |_|_|________________________|_|_|
-      \\_\\_\\                        /_/_/
-"""
