@@ -39,29 +39,25 @@ class HttpServer:
 
             # Create request object
             request = HttpRequest(method, path, headers)
-
-            # Extract path parameters
             handler, path_params = self.router.get_handler(method, path)
 
             if handler:
-                # Pass the request object and any path parameters to the handler
                 if path_params:
                     response = handler(request, **path_params)
                 else:
                     response = handler(request)
 
-                # Send response
-                response_data = HttpResponse(
-                    status_code=200, content_type="text/html", body=response
-                )
-            else:
-                # 404 not found
-                response_data = HttpResponse(
-                    status_code=404, content_type="text/html", body="404 Not Found"
-                )
+                # Ensure the response is an instance of HttpResponse
+                if not isinstance(response, HttpResponse):
+                    response = HttpResponse(body=response)
 
-            # Send formatted response
-            writer.write(response_data.format_response())
+                # Send the formatted response
+                writer.write(response.format_response())
+            else:
+                # Handle 404 not found
+                response = HttpResponse(status_code=404, body="404 Not Found")
+                writer.write(response.format_response())
+
             await writer.drain()
         finally:
             writer.close()
