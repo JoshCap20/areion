@@ -19,3 +19,11 @@ class HttpRequest:
 
     def __repr__(self):
         return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
+    
+    def as_dict(self):
+        return {
+            "method": self.method,
+            "path": self.path,
+            "headers": self.headers,
+            "metadata": self.metadata
+        }

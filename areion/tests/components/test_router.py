@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import Mock
 from areion.default import Router
 
 class TestRouter(unittest.TestCase):
