@@ -61,7 +61,7 @@ class TestRouter(unittest.TestCase):
         def test_handler(request):
             return "API OK"
         
-        api.add_route("/test", test_handler)  # Default GET method
+        api.add_route("/test", test_handler)
         self.assertIn("/api/test", self.router.routes)
         self.assertIn("GET", self.router.routes["/api/test"])
         self.assertEqual(self.router.routes["/api/test"]["GET"], test_handler)
