@@ -114,13 +114,14 @@ class AreionServer:
             )
             orchestrator_thread.start()
 
+        self.initialize_request_factory()
+        
         # Add the HTTP Server
+        # TODO: Could pass logger here
         self.http_server = HttpServer(
-            router=self.router, host=self.host, port=self.port
+            router=self.router, host=self.host, port=self.port, request_factory=self.request_factory
         )
         
-        self.initialize_request_factory()
-
         # TODO: Attach static file handler here
         if self.static_dir:
             self._serve_static_files()
