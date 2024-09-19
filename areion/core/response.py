@@ -14,6 +14,7 @@ HTTP_STATUS_CODES = {
     503: "Service Unavailable",
 }
 
+
 class HttpResponse:
     def __init__(self, body=None, status_code=200, content_type=None, headers=None):
         """
@@ -63,7 +64,9 @@ class HttpResponse:
             return self.body.encode("utf-8")  # Convert string to bytes
         elif isinstance(self.body, bytes):
             return self.body  # Return bytes as-is
-        return str(self.body).encode("utf-8")  # Convert other types to string and encode
+        return str(self.body).encode(
+            "utf-8"
+        )  # Convert other types to string and encode
 
     def _get_status_phrase(self):
         """
@@ -99,7 +102,7 @@ class HttpResponse:
         Returns:
             str: The formatted headers.
         """
-        return ''.join(f"{key}: {value}\r\n" for key, value in self.headers.items())
+        return "".join(f"{key}: {value}\r\n" for key, value in self.headers.items())
 
     def format_response(self) -> bytes:
         """

@@ -1,5 +1,7 @@
 class HttpRequest:
-    def __init__(self, method, path, headers, logger=None, engine=None, orchestrator=None):
+    def __init__(
+        self, method, path, headers, logger=None, engine=None, orchestrator=None
+    ):
         self.method = method
         self.path = path
         self.headers = headers
@@ -48,14 +50,15 @@ class HttpRequest:
 
     def __repr__(self):
         return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
-    
+
     def as_dict(self):
         return {
             "method": self.method,
             "path": self.path,
             "headers": self.headers,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
+
 
 class HttpRequestFactory:
     def __init__(self, logger=None, engine=None, orchestrator=None):
@@ -77,5 +80,5 @@ class HttpRequestFactory:
             headers=headers,
             logger=self.logger,
             engine=self.engine,
-            orchestrator=self.orchestrator
+            orchestrator=self.orchestrator,
         )

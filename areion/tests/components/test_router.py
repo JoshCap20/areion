@@ -1,6 +1,7 @@
 import unittest
 from areion.default import Router
 
+
 class TestRouter(unittest.TestCase):
 
     def setUp(self):
@@ -10,6 +11,7 @@ class TestRouter(unittest.TestCase):
     def test_add_route(self):
         def test_handler(request):
             return "OK"
+
         self.router.add_route("/test", test_handler, methods=["GET"])
         self.assertIn("/test", self.router.routes)
         self.assertIn("GET", self.router.routes["/test"])
@@ -18,6 +20,7 @@ class TestRouter(unittest.TestCase):
     def test_route_multiple_methods(self):
         def test_handler(request):
             return "OK"
+
         self.router.add_route("/test", test_handler, methods=["GET", "POST"])
         self.assertIn("/test", self.router.routes)
         self.assertIn("GET", self.router.routes["/test"])
@@ -28,38 +31,40 @@ class TestRouter(unittest.TestCase):
     def test_route_not_found(self):
         def test_handler(request):
             return "OK"
+
         self.router.add_route("/test", test_handler, methods=["GET"])
         # Simulate an invalid route request
-        request = type('Request', (object,), {'path': '/wrong'})()
+        request = type("Request", (object,), {"path": "/wrong"})()
         handler = self.router.routes.get(request.path, {}).get("GET")
         self.assertIsNone(handler)
 
     def test_route_method_not_allowed(self):
         def test_handler(request):
             return "OK"
+
         self.router.add_route("/test", test_handler, methods=["GET"])
         # Simulate a method that is not allowed
-        request = type('Request', (object,), {'path': '/test'})()
+        request = type("Request", (object,), {"path": "/test"})()
         handler = self.router.routes.get(request.path, {}).get("POST")
         self.assertIsNone(handler)
 
     # Group routes (Sub-router) tests
     def test_group_routes(self):
         api = self.router.group("/api")
-        
+
         def test_handler(request):
             return "API OK"
-        
+
         api.add_route("/test", test_handler, methods=["GET"])
         self.assertIn("/api/test", self.router.routes)
         self.assertEqual(self.router.routes["/api/test"]["GET"], test_handler)
 
     def test_group_inheriting_methods(self):
         api = self.router.group("/api")
-        
+
         def test_handler(request):
             return "API OK"
-        
+
         api.add_route("/test", test_handler)
         self.assertIn("/api/test", self.router.routes)
         self.assertIn("GET", self.router.routes["/api/test"])
@@ -67,16 +72,16 @@ class TestRouter(unittest.TestCase):
 
     def test_group_with_different_methods(self):
         api = self.router.group("/api")
-        
+
         def get_handler(request):
             return "GET OK"
-        
+
         def post_handler(request):
             return "POST OK"
 
         api.add_route("/test", get_handler, methods=["GET"])
         api.add_route("/test", post_handler, methods=["POST"])
-        
+
         self.assertEqual(self.router.routes["/api/test"]["GET"], get_handler)
         self.assertEqual(self.router.routes["/api/test"]["POST"], post_handler)
 
@@ -105,7 +110,7 @@ class TestRouter(unittest.TestCase):
         @self.router.route("/multi-method", methods=["GET", "POST"])
         def test_handler(request):
             return "Multi Method OK"
-        
+
         self.assertIn("/multi-method", self.router.routes)
         self.assertIn("GET", self.router.routes["/multi-method"])
         self.assertIn("POST", self.router.routes["/multi-method"])
@@ -116,27 +121,30 @@ class TestRouter(unittest.TestCase):
     def test_add_route_no_methods_implicit(self):
         def test_handler(request):
             return "OK"
+
         self.router.add_route("/test", test_handler)
-        
+
         self.assertIn("/test", self.router.routes)
         self.assertIn("GET", self.router.routes["/test"])
         self.assertEqual(self.router.routes["/test"]["GET"], test_handler)
-        
+
     def test_add_route_no_methods_explicit(self):
         def test_handler(request):
             return "OK"
-        
+
         with self.assertRaises(ValueError):
-            self.router.add_route("/test", test_handler, methods=[''])
+            self.router.add_route("/test", test_handler, methods=[""])
 
     def test_add_route_invalid_method(self):
         def test_handler(request):
             return "OK"
+
         with self.assertRaises(ValueError):
             self.router.add_route("/test", test_handler, methods=["INVALID"])
 
     def test_group_route_trailing_slash(self):
         api = self.router.group("/api/")
+
         def test_handler(request):
             return "API OK"
 
@@ -146,8 +154,10 @@ class TestRouter(unittest.TestCase):
 
     def test_group_route_edge_case(self):
         api = self.router.group("/api//")
+
         def test_handler(request):
             return "API OK"
+
         api.add_route("/test", test_handler)
         self.assertIn("/api/test", self.router.routes)
         self.assertEqual(self.router.routes["/api/test"]["GET"], test_handler)
@@ -156,7 +166,7 @@ class TestRouter(unittest.TestCase):
     def test_wildcard_route(self):
         def wildcard_handler(request):
             return "Wildcard OK"
-        
+
         self.router.add_route("/wildcard/*", wildcard_handler, methods=["GET"])
         self.assertIn("/wildcard/*", self.router.routes)
         self.assertEqual(self.router.routes["/wildcard/*"]["GET"], wildcard_handler)
@@ -165,13 +175,13 @@ class TestRouter(unittest.TestCase):
     def test_multiple_routes(self):
         def test_handler1(request):
             return "Handler 1"
-        
+
         def test_handler2(request):
             return "Handler 2"
 
         self.router.add_route("/route1", test_handler1, methods=["GET"])
         self.router.add_route("/route2", test_handler2, methods=["GET"])
-        
+
         self.assertIn("/route1", self.router.routes)
         self.assertIn("/route2", self.router.routes)
         self.assertEqual(self.router.routes["/route1"]["GET"], test_handler1)
@@ -184,10 +194,10 @@ class TestRouter(unittest.TestCase):
 
         def v1_handler(request):
             return "API V1"
-        
+
         def v2_handler(request):
             return "API V2"
-        
+
         api_v1.add_route("/users", v1_handler, methods=["GET"])
         api_v2.add_route("/users", v2_handler, methods=["GET"])
 

@@ -4,7 +4,9 @@ from .request import HttpRequest
 
 
 class HttpServer:
-    def __init__(self, router, request_factory, host: str = "localhost", port: int = 8080):
+    def __init__(
+        self, router, request_factory, host: str = "localhost", port: int = 8080
+    ):
         if not isinstance(port, int):
             raise ValueError("Port must be an integer.")
         if not isinstance(host, str):

@@ -13,8 +13,8 @@ class Orchestrator(BaseOrchestrator):
     def start(self):
         print("Orchestrator running.")
         self.scheduler.start()
-        self.run_tasks() # Run any pending tasks immediately
-        
+        self.run_tasks()  # Run any pending tasks immediately
+
     def submit_task(self, func, *args):
         task_name = getattr(func, "__name__", "unnamed_task")
         future = self.executor.submit(func, *args)
