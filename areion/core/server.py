@@ -5,7 +5,11 @@ from .request import HttpRequest
 
 class HttpServer:
     def __init__(
-        self, router, request_factory, host: str = "localhost", port: int = 8080
+        self,
+        router,
+        request_factory,
+        host: str = "localhost",
+        port: int = 8080
     ):
         if not isinstance(port, int):
             raise ValueError("Port must be an integer.")
@@ -18,6 +22,7 @@ class HttpServer:
         self.host = host
         self.port = port
         self._shutdown_event = asyncio.Event()
+
 
     async def _handle_client(self, reader, writer):
         try:
@@ -68,8 +73,6 @@ class HttpServer:
 
     async def start(self):
         server = await asyncio.start_server(self._handle_client, self.host, self.port)
-        addr = server.sockets[0].getsockname()
-        print(f"Serving on {addr}")
 
         async with server:
             await server.serve_forever()
@@ -81,4 +84,4 @@ class HttpServer:
         try:
             asyncio.run(self.start())
         except (KeyboardInterrupt, SystemExit):
-            print("Server shutting down...")
+            self.stop()

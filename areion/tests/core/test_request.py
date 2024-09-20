@@ -38,14 +38,36 @@ class TestHttpRequest(unittest.TestCase):
         expected_repr = f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={{}}>"
         self.assertEqual(repr(self.request), expected_repr)
 
-    def test_as_dict(self):
+    def test_as_dict_default(self):
         expected_dict = {
             "method": self.method,
             "path": self.path,
             "headers": self.headers,
-            "metadata": {},
         }
         self.assertEqual(self.request.as_dict(), expected_dict)
+
+    def test_as_dict_with_components(self):
+        self.request.logger = Mock()
+        self.request.engine = Mock()
+        self.request.orchestrator = Mock()
+        expected_dict = {
+            "method": self.method,
+            "path": self.path,
+            "headers": self.headers,
+            "metadata": self.request.metadata,
+            "logger": self.request.logger,
+            "engine": self.request.engine,
+            "orchestrator": self.request.orchestrator,
+        }
+        self.assertEqual(self.request.as_dict(show_components=True), expected_dict)
+
+    def test_as_dict_without_components(self):
+        expected_dict = {
+            "method": self.method,
+            "path": self.path,
+            "headers": self.headers,
+        }
+        self.assertEqual(self.request.as_dict(show_components=False), expected_dict)
 
     def test_add_header_overwrite(self):
         self.request.add_header("Content-Type", "text/plain")
@@ -102,10 +124,30 @@ class TestHttpRequest(unittest.TestCase):
         self.assertEqual(result, "Rendered Content")
         mock_engine.render.assert_called_once_with("template.html", {"key": "value"})
 
+    def test_render_template(self):
+        mock_engine = Mock()
+        mock_engine.render.return_value = "Rendered Content"
+        self.request.engine = mock_engine
+        result = self.request.render_template("template.html", {"key": "value"})
+        self.assertEqual(result, "Rendered Content")
+        mock_engine.render.assert_called_once_with("template.html", {"key": "value"})
+
     def test_render_template_no_engine(self):
         self.request.engine = None
+        with self.assertRaises(ValueError) as context:
+            self.request.render_template("template.html")
+        self.assertEqual(
+            str(context.exception),
+            "No template engine available to render the template.",
+        )
+
+    def test_render_template_default_context(self):
+        mock_engine = Mock()
+        mock_engine.render.return_value = "Rendered Content"
+        self.request.engine = mock_engine
         result = self.request.render_template("template.html")
-        self.assertIsNone(result)
+        self.assertEqual(result, "Rendered Content")
+        mock_engine.render.assert_called_once_with("template.html", {})
 
     def test_submit_task(self):
         mock_orchestrator = Mock()

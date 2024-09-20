@@ -205,3 +205,213 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(self.router.routes["/api/v1/users"]["GET"], v1_handler)
         self.assertIn("/api/v2/users", self.router.routes)
         self.assertEqual(self.router.routes["/api/v2/users"]["GET"], v2_handler)
+
+
+class TestRouterMiddleware(unittest.TestCase):
+    def setUp(self):
+        self.router = Router()
+
+    def test_middleware_execution(self):
+        def middleware(handler):
+            def wrapper(request):
+                request.processed = True
+                return handler(request)
+
+            return wrapper
+
+        def test_handler(request):
+            return "OK"
+
+        self.router.add_route(
+            "/test", test_handler, methods=["GET"], middlewares=[middleware]
+        )
+        request = type("Request", (object,), {"path": "/test", "processed": False})()
+        handler, _ = self.router.get_handler("GET", "/test")
+        response = handler(request)
+        self.assertTrue(request.processed)
+        self.assertEqual(response, "OK")
+
+    def test_middleware_chain(self):
+        def middleware1(handler):
+            def wrapper(request):
+                request.processed1 = True
+                return handler(request)
+
+            return wrapper
+
+        def middleware2(handler):
+            def wrapper(request):
+                request.processed2 = True
+                return handler(request)
+
+            return wrapper
+
+        def test_handler(request):
+            return "OK"
+
+        self.router.add_route(
+            "/test",
+            test_handler,
+            methods=["GET"],
+            middlewares=[middleware1, middleware2],
+        )
+        request = type(
+            "Request",
+            (object,),
+            {"path": "/test", "processed1": False, "processed2": False},
+        )()
+        handler, _ = self.router.get_handler("GET", "/test")
+        response = handler(request)
+        self.assertTrue(request.processed1)
+        self.assertTrue(request.processed2)
+        self.assertEqual(response, "OK")
+
+    def test_middleware_modifies_response(self):
+        def middleware(handler):
+            def wrapper(request):
+                response = handler(request)
+                return response + " Modified"
+
+            return wrapper
+
+        def test_handler(request):
+            return "OK"
+
+        self.router.add_route(
+            "/test", test_handler, methods=["GET"], middlewares=[middleware]
+        )
+        request = type("Request", (object,), {"path": "/test"})()
+        handler, _ = self.router.get_handler("GET", "/test")
+        response = handler(request)
+        self.assertEqual(response, "OK Modified")
+
+    def test_middleware_in_group(self):
+        api = self.router.group("/api")
+
+        def middleware(handler):
+            def wrapper(request):
+                request.processed = True
+                return handler(request)
+
+            return wrapper
+
+        def test_handler(request):
+            return "API OK"
+
+        api.add_route("/test", test_handler, methods=["GET"], middlewares=[middleware])
+        request = type(
+            "Request", (object,), {"path": "/api/test", "processed": False}
+        )()
+        handler, _ = self.router.get_handler("GET", "/api/test")
+        response = handler(request)
+        self.assertTrue(request.processed)
+        self.assertEqual(response, "API OK")
+
+    def test_middleware_decorator(self):
+        def middleware(handler):
+            def wrapper(request):
+                request.processed = True
+                return handler(request)
+
+            return wrapper
+
+        @self.router.route("/decorator", methods=["GET"], middlewares=[middleware])
+        def test_handler(request):
+            return "Decorator OK"
+
+        request = type(
+            "Request", (object,), {"path": "/decorator", "processed": False}
+        )()
+        handler, _ = self.router.get_handler("GET", "/decorator")
+        response = handler(request)
+        self.assertTrue(request.processed)
+        self.assertEqual(response, "Decorator OK")
+
+    def test_global_middleware(self):
+        def global_middleware(handler):
+            def wrapper(request):
+                request.global_processed = True
+                return handler(request)
+
+            return wrapper
+
+        def test_handler(request):
+            return "OK"
+
+        self.router.add_global_middleware(global_middleware)
+        self.router.add_route("/test", test_handler, methods=["GET"])
+        request = type(
+            "Request", (object,), {"path": "/test", "global_processed": False}
+        )()
+        handler, _ = self.router.get_handler("GET", "/test")
+        response = handler(request)
+        self.assertTrue(request.global_processed)
+        self.assertEqual(response, "OK")
+
+    def test_global_and_route_specific_middleware(self):
+        def global_middleware(handler):
+            def wrapper(request):
+                request.global_processed = True
+                return handler(request)
+
+            return wrapper
+
+        def route_middleware(handler):
+            def wrapper(request):
+                request.route_processed = True
+                return handler(request)
+
+            return wrapper
+
+        def test_handler(request):
+            return "OK"
+
+        self.router.add_global_middleware(global_middleware)
+        self.router.add_route(
+            "/test", test_handler, methods=["GET"], middlewares=[route_middleware]
+        )
+        request = type(
+            "Request",
+            (object,),
+            {"path": "/test", "global_processed": False, "route_processed": False},
+        )()
+        handler, _ = self.router.get_handler("GET", "/test")
+        response = handler(request)
+        self.assertTrue(request.global_processed)
+        self.assertTrue(request.route_processed)
+        self.assertEqual(response, "OK")
+
+    def test_middleware_order(self):
+        def middleware1(handler):
+            def wrapper(request):
+                request.order.append(1)
+                return handler(request)
+
+            return wrapper
+
+        def middleware2(handler):
+            def wrapper(request):
+                request.order.append(2)
+                return handler(request)
+
+            return wrapper
+
+        def test_handler(request):
+            request.order.append(3)
+            return "OK"
+
+        self.router.add_route(
+            "/test",
+            test_handler,
+            methods=["GET"],
+            middlewares=[middleware1, middleware2],
+        )
+        request = type("Request", (object,), {"path": "/test", "order": []})()
+        handler, _ = self.router.get_handler("GET", "/test")
+        response = handler(request)
+        self.assertEqual(request.order, [1, 2, 3])
+        self.assertEqual(response, "OK")
+
+
+if __name__ == "__main__":
+    unittest.main()
