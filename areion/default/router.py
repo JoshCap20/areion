@@ -9,12 +9,14 @@ class Router:
 
     def add_route(self, path, handler, methods=["GET"]):
         """
-        Adds a route to the router.
+        Adds a route to the router. See the `route` decorator for a more convenient way to add routes.
 
         Args:
             path (str): The URL path for the route.
             handler (callable): The function to handle requests to the route.
             methods (list, optional): A list of HTTP methods that the route should respond to. Defaults to ["GET"].
+        Raises:
+            ValueError: If no valid HTTP methods are provided. (No routes.)
 
         Example:
             def my_handler(request):
@@ -74,6 +76,11 @@ class Router:
 
         Returns:
             function: The decorated function with the route added.
+
+        Example:
+            @app.route("/hello", methods=["GET", "POST"])
+            def hello(request):
+                return "Hello, world!"
         """
 
         def decorator(func):

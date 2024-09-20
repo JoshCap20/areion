@@ -23,6 +23,7 @@ class HttpServer:
         self.port = port
         self._shutdown_event = asyncio.Event()
 
+
     async def _handle_client(self, reader, writer):
         try:
             request_line = await reader.readline()

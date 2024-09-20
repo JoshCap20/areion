@@ -59,6 +59,7 @@ class AreionServer:
         stop(self):
             Initiates server shutdown.
     """
+
     def __init__(
         self,
         host=DEFAULT_HOST,
@@ -69,7 +70,7 @@ class AreionServer:
         engine=None,
         static_dir=None,
         request_factory=None,
-        global_middlewares=None
+        global_middlewares=None,
     ):
         self.orchestrator: any | None = orchestrator
         self.router: any | None = router
@@ -84,12 +85,11 @@ class AreionServer:
         self.request_factory = request_factory
         self.global_middlewares = global_middlewares or []
 
-
     def run(self) -> None:
         """
-        Start the server synchronously. 
-        
-        This is a simplified entry point for users to start the server without 
+        Start the server synchronously.
+
+        This is a simplified entry point for users to start the server without
         dealing with asyncio directly.
 
         This method attempts to run the `start` coroutine using `asyncio.run()`.
@@ -219,6 +219,7 @@ class AreionServerBuilder:
         build():
             Constructs and returns an AreionServer instance with the configured components. Raises ValueError if required components are missing.
     """
+
     def __init__(self):
         self.host = DEFAULT_HOST
         self.port = DEFAULT_PORT
@@ -271,20 +272,19 @@ class AreionServerBuilder:
             raise ValueError(f"Static directory {static_dir} does not exist.")
         self.static_dir = static_dir
         return self
-    
+
     def _validate_component(self, component, required_methods, component_name):
         if not all(hasattr(component, method) for method in required_methods):
             raise ValueError(
                 f"{component_name} must implement {', '.join(required_methods)}"
             )
-            
+
     def _initialize_logger(self) -> None:
         if not self.logger:
             from .default import Logger as DefaultLogger
 
             self.logger = DefaultLogger()
             self.logger.info("Logger missing, defaulting to console logging.")
-
 
     def build(self):
         """
@@ -303,9 +303,9 @@ class AreionServerBuilder:
         request_factory = HttpRequestFactory(
             logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
         )
-        
+
         self._initialize_logger()
-        
+
         if self.orchestrator:
             self.orchestrator.set_logger(self.logger)
 
