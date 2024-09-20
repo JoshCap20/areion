@@ -36,6 +36,7 @@ class AreionServer:
         engine=None,
         static_dir=None,
         request_factory=None,
+        global_middlewares=None
     ):
         self.orchestrator: any | None = orchestrator
         self.router: any | None = router
@@ -48,6 +49,8 @@ class AreionServer:
         self._shutdown_event: asyncio.Event = asyncio.Event()
         self.http_server: HttpServer | None = None
         self.request_factory = request_factory
+        self.global_middlewares = global_middlewares or []
+
 
     def run(self) -> None:
         """
@@ -64,11 +67,6 @@ class AreionServer:
         Start the Areion server asynchronously
         """
         print(AREION_LOGO)
-        self._initialize_logger()
-
-        if not self.router:
-            self.logger.error("Router missing.")
-            return
 
         self.logger.info(f"Starting server on {self.host}:{self.port}")
 
@@ -91,15 +89,14 @@ class AreionServer:
         server_task = asyncio.create_task(self.http_server.start())
 
         self.logger.info(f"Server running on http://{self.host}:{self.port}")
-        self.logger.debug("Press Ctrl+C to stop the server.")
-        self.logger.info(f"Available Routes and Handlers: {self.router.routes}")
+        self.logger.debug(f"Available Routes and Handlers: {self.router.routes}")
 
         # Wait for shutdown signal
         await self._shutdown_event.wait()
 
-        self.logger.info("Shutting down server...")
+        self.logger.info("AerionSever shutdown initiated.")
         await self.shutdown(server_task)
-        self.logger.info("Server shutdown complete.")
+        self.logger.info("AerionServer shutdown complete.")
 
     async def shutdown(self, server_task):
         """
@@ -139,18 +136,10 @@ class AreionServer:
 
     def _start_orchestrator(self):
         if self.orchestrator:
-            self.logger.info("Starting orchestrator...")
             try:
                 self.orchestrator.start()
             except Exception as e:
                 self.logger.error(f"Orchestrator error: {e}")
-
-    def _initialize_logger(self) -> None:
-        if not self.logger:
-            from .default import Logger as DefaultLogger
-
-            self.logger = DefaultLogger()
-            self.logger.info("Logger missing, defaulting to console logging.")
 
     def _serve_static_files(self):
         # TODO: Implement serving static files
@@ -216,6 +205,14 @@ class AreionServerBuilder:
             raise ValueError(
                 f"{component_name} must implement {', '.join(required_methods)}"
             )
+            
+    def _initialize_logger(self) -> None:
+        if not self.logger:
+            from .default import Logger as DefaultLogger
+
+            self.logger = DefaultLogger()
+            self.logger.info("Logger missing, defaulting to console logging.")
+
 
     def build(self):
         if not self.router:
@@ -224,6 +221,11 @@ class AreionServerBuilder:
         request_factory = HttpRequestFactory(
             logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
         )
+        
+        self._initialize_logger()
+        
+        if self.orchestrator:
+            self.orchestrator.set_logger(self.logger)
 
         return AreionServer(
             host=self.host,
