@@ -24,11 +24,13 @@ class HttpRequest:
 
     def render_template(self, template_name, context=None):
         """
-        Uses the injected template engine (e.g., Jinja2) to render a template.
+        Uses the injected template engine to render a template.
         """
-        if self.engine and context is None:
+        if not self.engine:
+            raise ValueError("No template engine available to render the template.")
+        if context is None:
             context = {}
-        return self.engine.render(template_name, context) if self.engine else None
+        return self.engine.render(template_name, context)
 
     def submit_task(self, task, *args):
         """

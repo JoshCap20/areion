@@ -4,7 +4,7 @@ from ..base import BaseLogger
 
 class Logger(BaseLogger):
     def __init__(self, log_file=None, log_level=logging.INFO):
-        self.logger = logging.getLogger("arion")
+        self.logger = logging.getLogger("areion")
         self.logger.setLevel(log_level)
 
         formatter = logging.Formatter(
