@@ -257,7 +257,7 @@ class AreionServerBuilder:
         return self
 
     def with_logger(self, logger):
-        self._validate_component(logger, ["info", "error", "debug"], "Logger")
+        self._validate_component(logger, ["info", "error", "debug", "warning", "critical"], "Logger")
         self.logger = logger
         return self
 

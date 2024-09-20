@@ -20,11 +20,17 @@ class Logger(BaseLogger):
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
 
-    def info(self, message):
+    def info(self, message: str) -> None:
         self.logger.info(message)
 
-    def debug(self, message):
+    def debug(self, message: str) -> None:
         self.logger.debug(message)
 
-    def error(self, message):
+    def error(self, message: str) -> None:
         self.logger.error(message)
+
+    def warning(self, message: str) -> None:
+        self.logger.warning(message)
+        
+    def critical(self, message: str) -> None:
+        self.logger.critical(message)
