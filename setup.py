@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="areion",
-    version="1.0.0",
+    version="1.0.1",
     author="Josh Caponigro",
     author_email="joshcaponigro@gmail.com",
     description="A lightweight, fast, and extensible asynchronous Python web server framework",
@@ -18,6 +18,7 @@ setup(
     python_requires='>=3.6',
     install_requires=[
         "jinja2",
-        "apscheduler"
+        "apscheduler",
+        "asyncio",
     ],
 )
