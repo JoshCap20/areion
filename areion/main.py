@@ -151,6 +151,7 @@ class AreionServer:
 
         # Wait for the HTTP server to finish
         await server_task
+        self.stop()
 
         # Shutdown orchestrator
         if self.orchestrator:
