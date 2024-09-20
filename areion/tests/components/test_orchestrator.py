@@ -1,13 +1,13 @@
 import unittest
 from unittest.mock import Mock, patch
-from areion.default import Orchestrator
+from ... import DefaultOrchestrator
 from concurrent.futures import ThreadPoolExecutor
 
 
 class TestOrchestrator(unittest.TestCase):
 
     def setUp(self):
-        self.orchestrator = Orchestrator(max_workers=2)
+        self.orchestrator = DefaultOrchestrator(max_workers=2)
         self.logger = Mock()
         self.orchestrator.set_logger(self.logger)
 
@@ -67,7 +67,7 @@ class TestOrchestrator(unittest.TestCase):
     def test_orchestrator_shutdown(
         self, mock_scheduler_shutdown, mock_executor_shutdown
     ):
-        orchestrator = Orchestrator(max_workers=2)
+        orchestrator = DefaultOrchestrator(max_workers=2)
         orchestrator.shutdown()
 
         mock_scheduler_shutdown.assert_called_once()

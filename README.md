@@ -4,6 +4,8 @@ Areion is a lightweight, fast, and extensible Python web server framework. It su
 
 Some say it is the simplest API ever. They might be right. To return a JSON response, you just return a dictionary. To return an HTML response, you just return a string. Return bytes for an octet-stream response. That's it.
 
+**Only compatible with Python 3.10 and above.**
+
 ## Key Features
 
 - **Simple API**: Return dictionaries for JSON responses and strings for HTML responses.

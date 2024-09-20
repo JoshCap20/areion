@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock
-from areion.core import HttpRequest, HttpRequestFactory
+from ... import HttpRequest, HttpRequestFactory
 
 
 class TestHttpRequest(unittest.TestCase):

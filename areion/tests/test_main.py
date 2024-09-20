@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock
-from areion import AreionServerBuilder, AreionServer
+from .. import AreionServerBuilder, AreionServer
 
 ## TODO: Implement tests for the AreionServer class
 

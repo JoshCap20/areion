@@ -1,11 +1,11 @@
 import unittest
-from areion.default import Router
+from ... import DefaultRouter
 
 
 class TestRouter(unittest.TestCase):
 
     def setUp(self):
-        self.router = Router()
+        self.router = DefaultRouter()
 
     # Base functionality tests
     def test_add_route(self):
@@ -209,7 +209,7 @@ class TestRouter(unittest.TestCase):
 
 class TestRouterMiddleware(unittest.TestCase):
     def setUp(self):
-        self.router = Router()
+        self.router = DefaultRouter()
 
     def test_middleware_execution(self):
         def middleware(handler):

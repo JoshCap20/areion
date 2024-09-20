@@ -1,5 +1,5 @@
 import unittest
-from areion.core import HttpResponse, HTTP_STATUS_CODES
+from ... import HttpResponse, HTTP_STATUS_CODES
 
 
 class TestHttpResponse(unittest.TestCase):
