@@ -8,6 +8,8 @@ class TestOrchestrator(unittest.TestCase):
 
     def setUp(self):
         self.orchestrator = Orchestrator(max_workers=2)
+        self.logger = Mock()
+        self.orchestrator.set_logger(self.logger)
 
     # Base functionality: Test task submission
     def test_task_submission(self):

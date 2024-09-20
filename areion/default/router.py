@@ -49,10 +49,11 @@ class Router:
             Router: A sub-router instance with the specified base path.
         """
         sub_router = Router()
+        group_middlewares = middlewares or []
 
-        def add_sub_route(sub_path, handler, methods=["GET"], route_middlewares=None):
+        def add_sub_route(sub_path, handler, methods=["GET"], middlewares=None):
             full_path = f"{base_path.rstrip('/')}/{sub_path.lstrip('/')}"
-            combined_middlewares = (middlewares or []) + (route_middlewares or [])
+            combined_middlewares = (middlewares or []) + (group_middlewares or [])
             self.add_route(
                 full_path, handler, methods, middlewares=combined_middlewares
             )
@@ -60,7 +61,7 @@ class Router:
         sub_router.add_route = add_sub_route
         return sub_router
 
-    def route(self, path, methods=["GET"], middlewares=None):
+    def route(self, path, methods=["GET"], middlewares=[]):
         """
         A decorator to define a route with optional middlewares.
 
