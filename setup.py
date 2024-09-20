@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="areion",
-    version="0.2.1",
+    version="1.0.0",
     author="Josh Caponigro",
     author_email="joshcaponigro@gmail.com",
     description="A lightweight, fast, and extensible asynchronous Python web server framework",
