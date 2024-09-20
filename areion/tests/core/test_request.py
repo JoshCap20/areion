@@ -177,6 +177,8 @@ class TestHttpRequest(unittest.TestCase):
         self.request.logger = None
         self.request.log("Test message", "info")  # Should not raise an exception
 
+    # TODO: Add integration tests with server
+
 
 class TestHttpRequestFactory(unittest.TestCase):
 

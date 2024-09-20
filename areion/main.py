@@ -116,7 +116,6 @@ class AreionServer:
         self._start_orchestrator_in_thread()
 
         # Add the HTTP Server
-        # TODO: Could pass logger here
         self.http_server = HttpServer(
             router=self.router,
             host=self.host,
@@ -257,7 +256,9 @@ class AreionServerBuilder:
         return self
 
     def with_logger(self, logger):
-        self._validate_component(logger, ["info", "error", "debug", "warning", "critical"], "Logger")
+        self._validate_component(
+            logger, ["info", "error", "debug", "warning", "critical"], "Logger"
+        )
         self.logger = logger
         return self
 
