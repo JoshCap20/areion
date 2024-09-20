@@ -1,5 +1,7 @@
 # Areion
 
+[![PyPi][pypi-shield]][pypi-url]  [![PyPi][pypiversion-shield]][pypi-url]  [![License][license-shield]][license-url]  
+  
 Areion is a lightweight, fast, and extensible Python web server framework. It supports asynchronous operations, multithreading, routing, orchestration, customizable loggers, and template engines. The framework provides an intuitive API for building web services, with components like the `Orchestrator`, `Router`, `Logger`, and `Engine` easily swappable or extendable.
 
 Some say it is the simplest API ever. They might be right. To return a JSON response, you just return a dictionary. To return an HTML response, you just return a string. Return bytes for an octet-stream response. That's it.
@@ -284,3 +286,15 @@ MIT License
 Copyright (c) 2024 Joshua Caponigro
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.
+
+
+[pypi-shield]: https://img.shields.io/pypi/pyversions/areion?color=281158
+
+[pypi-url]: https://pypi.org/project/areion/
+
+[pypiversion-shield]: https://img.shields.io/pypi/v/areion?color=361776
+
+[license-url]: https://github.com/JoshCap20/areion/blob/main/LICENSE
+
+[license-shield]: https://img.shields.io/github/license/joshcap20/areion
+
