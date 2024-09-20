@@ -2,6 +2,7 @@ import asyncio
 from .response import HttpResponse
 from .request import HttpRequest
 
+
 class HttpServer:
     def __init__(
         self,
@@ -11,7 +12,7 @@ class HttpServer:
         port: int = 8080,
         max_conns: int = 1000,
         buffer_size: int = 8192,
-        keep_alive_timeout: int = 5
+        keep_alive_timeout: int = 60,
     ):
         if not isinstance(port, int):
             raise ValueError("Port must be an integer.")
@@ -23,6 +24,10 @@ class HttpServer:
             raise ValueError("Request factory must be provided.")
         if not isinstance(max_conns, int) or max_conns <= 0:
             raise ValueError("Max connections must be a positive integer.")
+        if not isinstance(buffer_size, int) or buffer_size <= 0:
+            raise ValueError("Buffer size must be a positive integer.")
+        if not isinstance(keep_alive_timeout, int) or keep_alive_timeout <= 0:
+            raise ValueError("Keep alive timeout must be a positive integer.")
         self.semaphore = asyncio.Semaphore(max_conns)
         self.router = router
         self.request_factory = request_factory
@@ -33,27 +38,45 @@ class HttpServer:
         self._shutdown_event = asyncio.Event()
 
     async def _handle_client(self, reader, writer, timeout: int = 60) -> None:
+        # Handles client connections
         async with self.semaphore:
             try:
                 while True:
                     try:
-                        await asyncio.wait_for(self._process_request(reader, writer), timeout=timeout)
-                    except asyncio.TimeoutError:
-                        break  # Timeout, close connection
+                        await asyncio.wait_for(
+                            self._process_request(reader, writer), timeout=timeout
+                        )
 
-                    # Get transport headers (if available)
-                    headers_info = writer.get_extra_info('headers')
-                    
-                    # Check if connection should be kept alive
-                    if headers_info and "Connection" in headers_info and headers_info['Connection'].lower() == "keep-alive":
-                        await asyncio.sleep(self.keep_alive_timeout)
-                    else:
-                        break
+                        # Check if connection should be kept alive
+                        headers_info = writer.get_extra_info("headers")
+                        if (
+                            headers_info
+                            and "Connection" in headers_info
+                            and headers_info["Connection"].lower() == "keep-alive"
+                        ):
+                            # Wait for another request or timeout after `keep_alive_timeout`
+                            try:
+                                await asyncio.wait_for(
+                                    reader.readline(), timeout=self.keep_alive_timeout
+                                )
+                            except asyncio.TimeoutError:
+                                # No more requests, close the connection
+                                break
+                        else:
+                            # If connection should not be kept alive, break the loop and close the connection
+                            break
+                    except asyncio.TimeoutError:
+                        # Timeout occurred, close the connection
+                        pass
+                    except Exception as e:
+                        # TODO: Log any other exceptions and close the connection
+                        print(f"Error: {e}")
             finally:
                 writer.close()
                 await writer.wait_closed()
 
     async def _process_request(self, reader, writer):
+        # Handles reading the request and sending the response
         try:
             # Read the request line
             request_line = await reader.readline()
@@ -100,14 +123,14 @@ class HttpServer:
         finally:
             writer.close()
             await writer.wait_closed()
-            
+
     async def _send_response(self, writer, response):
         buffer = response.format_response()
 
         # Chunked response for large bodies
         chunk_size = self.buffer_size
         for i in range(0, len(buffer), chunk_size):
-            writer.write(buffer[i:i+chunk_size])
+            writer.write(buffer[i : i + chunk_size])
             await writer.drain()
 
     async def start(self):
