@@ -55,8 +55,7 @@ class HttpServer:
     async def _process_request(self, reader, writer):
         # Ensures that the request is processed within the timeout
         # TODO: Move request and client timeouts to separate variables
-        # TODO: Add optional request logging
-        # TODO: Add custom exception handling
+        # TODO: Add optional request logging (add as middleware instead?)
         try:
             await asyncio.wait_for(
                 self._handle_request_logic(reader, writer),
@@ -70,18 +69,19 @@ class HttpServer:
         request_line = await reader.readline()
         if not request_line:
             return
+
         method, path, _ = request_line.decode("utf-8").strip().split(" ")
         headers = await self._parse_headers(reader)
+
         request = self.request_factory.create(method, path, headers)
 
-        handler, path_params = self.router.get_handler(method, path)
+        handler, path_params, is_async = self.router.get_handler(method, path)
+
+        if not handler:
+            raise NotFoundError()
 
         try:
-            if not handler:
-                raise NotFoundError()
-
-            # TODO: Move this to router get handler dict so dont have to do this at runtime
-            if asyncio.iscoroutinefunction(handler):
+            if is_async:
                 response = await handler(request, **path_params)
             else:
                 response = handler(request, **path_params)
