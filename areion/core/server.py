@@ -77,10 +77,10 @@ class HttpServer:
 
         handler, path_params, is_async = self.router.get_handler(method, path)
 
-        if not handler:
-            raise NotFoundError()
-
         try:
+            if not handler:
+                raise NotFoundError()
+        
             if is_async:
                 response = await handler(request, **path_params)
             else:
