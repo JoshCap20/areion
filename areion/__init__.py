@@ -1,4 +1,4 @@
-from .main import AreionServer, AreionServerBuilder
+from .main import AreionServer, AreionServerBuilder, AREION_LOGO, DEFAULT_HOST, DEFAULT_PORT
 
 # Reminds people that people can build their own parts
 from .default.logger import Logger as DefaultLogger
@@ -52,4 +52,8 @@ __all__ = [
     "NotFoundError",
     "MethodNotAllowedError",
     "InternalServerError",
+    # Misc
+    AREION_LOGO,
+    DEFAULT_HOST,
+    DEFAULT_PORT,
 ]
