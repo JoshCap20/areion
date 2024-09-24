@@ -128,7 +128,7 @@ class AreionServer:
             self._serve_static_files()
 
         # Start the HTTP server
-        server_task = asyncio.create_task(self.http_server.start())
+        server_task = await self.http_server.run()
 
         self.logger.info(f"Server running on http://{self.host}:{self.port}")
         self.logger.debug(f"Available Routes and Handlers: {self.router.routes}")
