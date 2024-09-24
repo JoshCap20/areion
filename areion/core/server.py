@@ -1,4 +1,6 @@
 import asyncio
+
+from .exceptions import HttpError, NotFoundError
 from .response import HttpResponse
 from .request import HttpRequest
 
@@ -72,23 +74,22 @@ class HttpServer:
         headers = await self._parse_headers(reader)
         request = self.request_factory.create(method, path, headers)
 
+        handler, path_params = self.router.get_handler(method, path)
+
         try:
-            handler, path_params = self.router.get_handler(method, path)
-            
-            # Change this to raise 404 exception after thats built
             if not handler:
-                response = HttpResponse(status_code=404, body="Not Found")
-            
-            if not path_params:
-                path_params = {}
-                
+                raise NotFoundError()
+
             # TODO: Move this to router get handler dict so dont have to do this at runtime
-            # TODO: Simplify
-            if handler and asyncio.iscoroutinefunction(handler):
+            if asyncio.iscoroutinefunction(handler):
                 response = await handler(request, **path_params)
-            elif handler:
+            else:
                 response = handler(request, **path_params)
-        except Exception:
+        except HttpError as e:
+            # Handles web exceptions raised by the handler
+            response = HttpResponse(status_code=e.status_code, body=e)
+        except Exception as e:
+            # Handles all other exceptions
             response = HttpResponse(status_code=500, body="Internal Server Error")
 
         await self._send_response(writer, response)
@@ -104,11 +105,10 @@ class HttpServer:
         return headers
 
     async def _send_response(self, writer, response):
-        # TODO: Move Response assertion here
         # TODO: Add optional response logging
         if not isinstance(response, HttpResponse):
             response = HttpResponse(body=response)
-            
+
         buffer = response.format_response()
         chunk_size = self.buffer_size
 
