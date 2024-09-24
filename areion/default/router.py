@@ -9,37 +9,28 @@ class Router:
         self.global_middlewares = []
 
     def add_route(self, path, handler, methods=["GET"], middlewares=None):
-        """
-        Adds a route to the Trie, supporting dynamic path segments (e.g., /users/:id).
-        """
-        methods = [
-            method.upper()
-            for method in methods
-            if method.upper() in self.allowed_methods
-        ]
-        if not methods:
-            raise ValueError(
-                "At least one valid HTTP method must be provided per route."
-            )
-
         segments = self._split_path(path)
-
         current_node = self.root
         for segment in segments:
-            if segment.startswith(":"):
-                segment = ":"
-                current_node.is_dynamic = True
-                current_node.param_name = segment[1:]
-
-            if segment not in current_node.children:
-                current_node.children[segment] = TrieNode()
-            current_node = current_node.children[segment]
+            if segment.startswith(":"):  # Dynamic path segment
+                if current_node.dynamic_child is None:
+                    current_node.dynamic_child = TrieNode()
+                    current_node.dynamic_child.param_name = segment[1:]
+                current_node = current_node.dynamic_child
+            else:  # Static path segment
+                if segment not in current_node.children:
+                    current_node.children[segment] = TrieNode()
+                current_node = current_node.children[segment]
 
         for method in methods:
+            combined_middlewares = self.global_middlewares + (middlewares or [])
+            wrapped_handler = handler
+            for middleware in reversed(combined_middlewares):
+                wrapped_handler = middleware(wrapped_handler)
+
             current_node.handler[method] = {
-                "handler": handler,
+                "handler": wrapped_handler,
                 "is_async": iscoroutinefunction(handler),
-                "middlewares": middlewares or [],
             }
 
     def group(self, base_path, middlewares=None):
@@ -89,34 +80,24 @@ class Router:
         return decorator
 
     def get_handler(self, method, path):
-        """
-        Retrieves the appropriate route handler based on method and path using Trie traversal.
-        Supports dynamic paths.
-        """
         segments = self._split_path(path)
         current_node = self.root
         path_params = {}
 
         for segment in segments:
             if segment in current_node.children:
-                # Static path segment
                 current_node = current_node.children[segment]
-            elif ":" in current_node.children:
-                # Dynamic path segment
-                param_node = current_node.children[":"]
-                path_params[param_node.param_name] = segment
+            elif current_node.dynamic_child:  # Match dynamic segments
+                param_node = current_node.dynamic_child
+                path_params[param_node.param_name] = segment  # Store dynamic param
                 current_node = param_node
             else:
-                # No matching path segment
                 return None, None, None
 
         if method in current_node.handler:
             handler_info = current_node.handler[method]
-            handler_with_middlewares = self._apply_middlewares(
-                handler_info, method, path
-            )
             is_async = handler_info["is_async"]
-            return handler_with_middlewares, path_params, is_async
+            return handler_info["handler"], path_params, is_async
 
         return None, None, None
 
@@ -172,5 +153,5 @@ class TrieNode:
     def __init__(self):
         self.children = {}
         self.handler = {}
-        self.is_dynamic = False
+        self.dynamic_child = None
         self.param_name = None
