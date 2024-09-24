@@ -9,7 +9,10 @@ class HttpServer:
         router,
         request_factory,
         host: str = "localhost",
-        port: int = 8080
+        port: int = 8080,
+        max_conns: int = 1000,
+        buffer_size: int = 8192,
+        keep_alive_timeout: int = 5,
     ):
         if not isinstance(port, int):
             raise ValueError("Port must be an integer.")
@@ -17,71 +20,121 @@ class HttpServer:
             raise ValueError("Host must be a string.")
         if not router:
             raise ValueError("Router must be provided.")
+        if not request_factory:
+            raise ValueError("Request factory must be provided.")
+        if not isinstance(max_conns, int) or max_conns <= 0:
+            raise ValueError("Max connections must be a positive integer.")
+        if not isinstance(buffer_size, int) or buffer_size <= 0:
+            raise ValueError("Buffer size must be a positive integer.")
+        if not isinstance(keep_alive_timeout, int) or keep_alive_timeout <= 0:
+            raise ValueError("Keep alive timeout must be a positive integer.")
+        self.semaphore = asyncio.Semaphore(max_conns)
         self.router = router
         self.request_factory = request_factory
         self.host = host
         self.port = port
+        self.buffer_size = buffer_size
+        self.keep_alive_timeout = keep_alive_timeout
         self._shutdown_event = asyncio.Event()
 
-
-    async def _handle_client(self, reader, writer):
-        try:
-            request_line = await reader.readline()
-            if not request_line:
-                return
-
-            # Parse the request line
-            request_line = request_line.decode("utf-8").strip()
-            method, path, _ = request_line.split(" ")
-
-            # Parse headers
-            headers = {}
-            while True:
-                header_line = await reader.readline()
-                if header_line == b"\r\n":
-                    break
-                header_name, header_value = (
-                    header_line.decode("utf-8").strip().split(": ", 1)
+    async def _handle_client(self, reader, writer, timeout: int = 15) -> None:
+        # Handles client connections
+        async with self.semaphore:
+            try:
+                await asyncio.wait_for(
+                    self._process_request(reader, writer), timeout=timeout
                 )
-                headers[header_name] = header_value
+            except asyncio.TimeoutError:
+                pass
+            finally:
+                writer.close()
+                await writer.wait_closed()
 
-            # Create request object
-            request = self.request_factory.create(method, path, headers)
+    async def _process_request(self, reader, writer):
+        # Ensures that the request is processed within the timeout
+        # TODO: Move request and client timeouts to separate variables
+        # TODO: Add optional request logging
+        # TODO: Add custom exception handling
+        try:
+            await asyncio.wait_for(
+                self._handle_request_logic(reader, writer),
+                timeout=self.keep_alive_timeout,
+            )
+        except asyncio.TimeoutError:
+            response = HttpResponse(status_code=408, body="Request Timeout")
+            await self._send_response(writer, response)
+
+    async def _handle_request_logic(self, reader, writer):
+        request_line = await reader.readline()
+        if not request_line:
+            return
+        method, path, _ = request_line.decode("utf-8").strip().split(" ")
+        headers = await self._parse_headers(reader)
+        request = self.request_factory.create(method, path, headers)
+
+        try:
             handler, path_params = self.router.get_handler(method, path)
+            
+            # Change this to raise 404 exception after thats built
+            if not handler:
+                response = HttpResponse(status_code=404, body="Not Found")
+            
+            if not path_params:
+                path_params = {}
+                
+            # TODO: Move this to router get handler dict so dont have to do this at runtime
+            # TODO: Simplify
+            if handler and asyncio.iscoroutinefunction(handler):
+                response = await handler(request, **path_params)
+            elif handler:
+                response = handler(request, **path_params)
+        except Exception:
+            response = HttpResponse(status_code=500, body="Internal Server Error")
 
-            if handler:
-                if path_params:
-                    response = handler(request, **path_params)
-                else:
-                    response = handler(request)
+        await self._send_response(writer, response)
 
-                # Ensure the response is an instance of HttpResponse
-                if not isinstance(response, HttpResponse):
-                    response = HttpResponse(body=response)
+    async def _parse_headers(self, reader):
+        headers = {}
+        while True:
+            line = await reader.readline()
+            if line == b"\r\n":
+                break
+            header_name, header_value = line.decode("utf-8").strip().split(": ", 1)
+            headers[header_name] = header_value
+        return headers
 
-                # Send the formatted response
-                writer.write(response.format_response())
-            else:
-                # Handle 404 not found
-                response = HttpResponse(status_code=404, body="404 Not Found")
-                writer.write(response.format_response())
+    async def _send_response(self, writer, response):
+        # TODO: Move Response assertion here
+        # TODO: Add optional response logging
+        if not isinstance(response, HttpResponse):
+            response = HttpResponse(body=response)
+            
+        buffer = response.format_response()
+        chunk_size = self.buffer_size
 
+        for i in range(0, len(buffer), chunk_size):
+            writer.write(buffer[i : i + chunk_size])
             await writer.drain()
-        finally:
-            writer.close()
-            await writer.wait_closed()
+
+        await writer.drain()
 
     async def start(self):
-        server = await asyncio.start_server(self._handle_client, self.host, self.port)
-
-        async with server:
-            await server.serve_forever()
+        # Handles server startup
+        self._server = await asyncio.start_server(
+            self._handle_client, self.host, self.port
+        )
+        async with self._server:
+            await self._shutdown_event.wait()
 
     async def stop(self):
+        # Handles server shutdown
+        if self._server:
+            self._server.close()
+            await self._server.wait_closed()
         self._shutdown_event.set()
 
-    def run(self):
+    async def run(self, *args, **kwargs):
         try:
-            asyncio.run(self.start())
+            await self.start()
         except (KeyboardInterrupt, SystemExit):
-            self.stop()
+            await self.stop()

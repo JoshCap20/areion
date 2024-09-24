@@ -116,7 +116,6 @@ class AreionServer:
         self._start_orchestrator_in_thread()
 
         # Add the HTTP Server
-        # TODO: Could pass logger here
         self.http_server = HttpServer(
             router=self.router,
             host=self.host,
@@ -129,7 +128,7 @@ class AreionServer:
             self._serve_static_files()
 
         # Start the HTTP server
-        server_task = asyncio.create_task(self.http_server.start())
+        server_task = await self.http_server.run()
 
         self.logger.info(f"Server running on http://{self.host}:{self.port}")
         self.logger.debug(f"Available Routes and Handlers: {self.router.routes}")
@@ -257,7 +256,9 @@ class AreionServerBuilder:
         return self
 
     def with_logger(self, logger):
-        self._validate_component(logger, ["info", "error", "debug"], "Logger")
+        self._validate_component(
+            logger, ["info", "error", "debug", "warning", "critical"], "Logger"
+        )
         self.logger = logger
         return self
 

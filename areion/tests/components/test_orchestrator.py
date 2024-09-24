@@ -60,8 +60,6 @@ class TestOrchestrator(unittest.TestCase):
 
         self.orchestrator.submit_task(task_with_exception)
 
-        # TODO: Test for logging on error later
-
     @patch.object(ThreadPoolExecutor, "shutdown", return_value=None)
     @patch("apscheduler.schedulers.background.BackgroundScheduler.shutdown")
     def test_orchestrator_shutdown(
