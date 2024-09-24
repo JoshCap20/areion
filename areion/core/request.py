@@ -32,10 +32,16 @@ class HttpRequest:
         """
         return self.headers.get(key)
 
-    def add_metadata(self, key, value):
+    def add_metadata(self, key: str, value: any) -> None:
+        """
+        Adds a metadata entry to the request.
+        Args:
+            key (str): The key for the metadata entry.
+            value (any): The value for the metadata entry.
+        """
         self.metadata[key] = value
 
-    def get_metadata(self, key):
+    def get_metadata(self, key) -> any:
         """
         Retrieve the value associated with a given key from the metadata.
         Args:
@@ -45,7 +51,7 @@ class HttpRequest:
         """
         return self.metadata.get(key)
 
-    def render_template(self, template_name: str, context: dict = None):
+    def render_template(self, template_name: str, context: dict = None) -> str:
         """
         Renders a template using the injected template engine.
         Args:
@@ -78,7 +84,7 @@ class HttpRequest:
         else:
             raise ValueError("No orchestrator available to submit the task.")
 
-    def log(self, message, level="info"):
+    def log(self, message: str, level: str = "info"):
         """
         Log a message using the injected logger.
         Parameters:
@@ -93,7 +99,10 @@ class HttpRequest:
             if log_method:
                 log_method(message)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
+    
+    def __str__(self) -> str:
         return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
 
     def as_dict(self, show_components: bool = False):

@@ -1,7 +1,3 @@
-import json
-from http.server import BaseHTTPRequestHandler
-
-
 class Router:
     def __init__(self):
         self.routes = {}
