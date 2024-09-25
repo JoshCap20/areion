@@ -10,7 +10,8 @@ class TestHttpResponse(unittest.TestCase):
 
         self.assertIn(b"HTTP/1.1 200 OK", formatted_response)
         self.assertIn(b"Content-Type: application/json", formatted_response)
-        self.assertIn(b'"key": "value"', formatted_response)
+        self.assertIn(b'{"key":"value"}', formatted_response)
+        
 
     def test_html_response(self):
         body = "<html><body>Hello, World!</body></html>"
