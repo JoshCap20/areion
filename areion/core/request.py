@@ -1,3 +1,6 @@
+from .response import HttpResponse
+
+
 class HttpRequest:
     def __init__(
         self, method, path, headers, logger=None, engine=None, orchestrator=None
@@ -66,7 +69,8 @@ class HttpRequest:
             raise ValueError("No template engine available to render the template.")
         if context is None:
             context = {}
-        return self.engine.render(template_name, context)
+        template = self.engine.render(template_name, context)
+        return HttpResponse(content_type="text/html", body=template)
 
     def submit_task(self, task: callable, *args):
         """

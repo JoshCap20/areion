@@ -121,7 +121,6 @@ class HttpServer:
 
     async def start(self):
         # Handles server startup
-        self.log("info", f"Starting HTTPserver on {self.host}:{self.port}")
         self._server = await asyncio.start_server(
             self._handle_client, self.host, self.port
         )
@@ -130,7 +129,6 @@ class HttpServer:
 
     async def stop(self):
         # Handles server shutdown
-        self.log("info", "Shutting down HTTPserver.")
         if self._server:
             self._server.close()
             await self._server.wait_closed()

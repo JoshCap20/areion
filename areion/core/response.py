@@ -97,8 +97,6 @@ class HttpResponse:
         """
         if isinstance(body, dict):
             return "application/json"
-        elif isinstance(body, str):
-            return "text/html" if "<html" in body else "text/plain"
         elif isinstance(body, bytes):
             return "application/octet-stream"
         return "text/plain"  # Default content type
