@@ -10,73 +10,22 @@ We designed Areion to have as few dependencies as possible. We created our own H
 
 **Development Mode:** Add the flag `with_development_mode(True)` to the `AreionServerBuilder` to enable development mode. This mode will automatically add Swagger UI and OpenAPI routes to your server. They are accessible from the routes `/docs` and `/openapi` respectively.
 
-## Benchmark
-
-We conducted performance benchmarks to compare Areion with FastAPI, focusing on throughput and latency under high-load conditions. The goal was to evaluate Areion's ability to handle concurrent connections efficiently and provide fast response times. We used the same JSON response in all frameworks to ensure a fair comparison.
-
-## Benchmark Results
-
-#### Areion
-
-```bash
-Running 30s test @ http://localhost:8000/json
-  12 threads and 400 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     7.41ms    2.82ms  50.61ms   93.04%
-    Req/Sec     4.57k   696.46     6.30k    84.17%
-  1,637,309 requests in 30.05s, 154.58MB read
-  Socket errors: connect 0, read 944, write 0, timeout 0
-  Non-2xx or 3xx responses: 405
-Requests/sec:  54,489.45
-Transfer/sec:      5.14MB
-```
-
-#### FastAPI
-
-```bash
-Running 30s test @ http://localhost:8000/json
-  12 threads and 400 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency    73.42ms   10.92ms 190.27ms   89.45%
-    Req/Sec   450.92     71.28   653.00     73.33%
-  161,989 requests in 30.10s, 23.48MB read
-  Socket errors: connect 0, read 418, write 0, timeout 0
-Requests/sec:   5,381.16
-Transfer/sec:    798.78KB
-```
-
-### Analysis
-
-#### Throughput (Requests per Second)
-
-Areion: 55,566.74 requests/sec  
-FastAPI: 5,381.16 requests/sec  
-Areion handled approximately 10 times more requests per second than FastAPI.
-
-#### Average Latency
-
-Areion: 7.15 ms  
-FastAPI: 73.42 ms  
-Areion's average latency is about 10 times lower than FastAPI's, indicating faster response times.
-
-#### Total Requests Handled
-
-Areion: 1,668,675 requests  
-FastAPI: 161,989 requests  
-Areion processed significantly more total requests during the test duration.
-
-#### Socket Errors
-
-Areion: 2,622 read errors  
-FastAPI: 418 read errors  
-Areion encountered more socket read errors due to the higher number of connections and requests.
-
 ## Table of Contents
 
+- [Benchmark](#benchmark)
+  - [Benchmark Results](#benchmark-results)
+    - [Summary](#summary)
+    - [Visualization](#visualization)
+    - [Detailed Results](#detailed-results)
+  - [Analysis](#analysis)
+    - [Throughput (Requests per Second)](#throughput-requests-per-second)
+    - [Average Latency](#average-latency)
+    - [Total Requests Handled](#total-requests-handled)
+    - [Socket Errors](#socket-errors)
 - [Getting Started](#getting-started)
   - [Installation](#installation)
   - [Quick Start Guide](#quick-start-guide)
-  - [Enabling Development Tools](#enabling-development-tools)
+  - [Development Tools](#development-tools)
 - [Core Components](#core-components)
   - [AreionServer](#areionserver)
   - [Router](#router)
@@ -99,6 +48,106 @@ Areion encountered more socket read errors due to the higher number of connectio
 - [License](#license)
 
 ---
+
+## Benchmark
+
+We conducted performance benchmarks to compare **Areion**, **FastAPI**, and **Flask**, focusing on throughput and latency under high-load conditions. The goal was to evaluate each framework's ability to handle concurrent connections efficiently and provide fast response times. We used the same JSON response in all frameworks to ensure a fair comparison.
+
+### Benchmark Results
+
+These show the results of running the benchmark test for 30 seconds with 12 threads and 400 connections on my local machine. The test was conducted using the `wrk` benchmarking tool. The results are summarized below, followed by detailed output for each framework.
+
+#### Summary
+
+| Framework | Requests/sec | Avg Latency (ms) | Transfer/sec | Total Requests | Socket Errors             |
+| --------- | ------------ | ---------------- | ------------ | -------------- | ------------------------- |
+| Areion    | 47,241.97    | 8.46             | 4.42 MB      | 1,418,550      | Read: 545                 |
+| FastAPI   | 3,579.10     | 111.53           | 531.27 KB    | 107,613        | Read: 419                 |
+| Flask     | 555.98       | 47.45            | 104.79 KB    | 16,708         | Connect: 74, Read: 36,245 |
+
+#### Visualization
+
+![Requests per Second](assets/requests_per_second.png)
+
+![Average Latency](assets/average_latency.png)
+
+#### Detailed Results
+
+**Areion**
+
+```bash
+Running 30s test @ http://localhost:8000/json
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     8.46ms    2.06ms  47.38ms   95.91%
+    Req/Sec     3.96k   430.06     5.36k    87.17%
+  1,418,550 requests in 30.03s, 132.58MB read
+  Socket errors: connect 0, read 545, write 0, timeout 0
+Requests/sec:  47,241.97
+Transfer/sec:      4.42MB
+```
+
+**FastAPI**
+
+```bash
+Running 30s test @ http://localhost:8000/json
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency   111.53ms   31.97ms 498.08ms   89.55%
+    Req/Sec   300.08     59.85   430.00     86.17%
+  107,613 requests in 30.07s, 15.60MB read
+  Socket errors: connect 0, read 419, write 0, timeout 0
+Requests/sec:   3,579.10
+Transfer/sec:    531.27KB
+```
+
+**Flask**
+
+```bash
+Running 30s test @ http://localhost:8000/json
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    47.45ms   53.33ms 556.78ms   96.24%
+    Req/Sec   183.12    104.16   590.00     70.64%
+  16,708 requests in 30.05s, 3.08MB read
+  Socket errors: connect 74, read 36,245, write 125, timeout 0
+Requests/sec:     555.98
+Transfer/sec:    104.79KB
+```
+
+### Analysis
+
+#### Throughput (Requests per Second)
+
+- **Areion:** 47,241.97 requests/sec
+- **FastAPI:** 3,579.10 requests/sec
+- **Flask:** 555.98 requests/sec
+
+Areion handled approximately 13 times more requests per second than FastAPI and 85 times more than Flask.
+
+#### Average Latency
+
+- **Areion:** 8.46 ms
+- **Flask:** 47.45 ms
+- **FastAPI:** 111.53 ms
+
+Areion's average latency is about 5.6 times lower than Flask and 13 times lower than FastAPI, indicating faster response times.
+
+#### Total Requests Handled
+
+- **Areion:** 1,418,550 requests
+- **FastAPI:** 107,613 requests
+- **Flask:** 16,708 requests
+
+Areion processed significantly more total requests during the test duration.
+
+#### Socket Errors
+
+- **Areion:** Read errors: 545
+- **FastAPI:** Read errors: 419
+- **Flask:** Connect errors: 74, Read errors: 36,245, Write errors: 125
+
+For handling 10x the requests of FastAPI and 85x the requests of Flask, Areion had a relatively low number of socket errors.
 
 ## Getting Started
 
