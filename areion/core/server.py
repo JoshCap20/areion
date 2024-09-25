@@ -10,11 +10,12 @@ class HttpServer:
         self,
         router,
         request_factory,
+        logger=None,
         host: str = "localhost",
         port: int = 8080,
         max_conns: int = 1000,
         buffer_size: int = 8192,
-        keep_alive_timeout: int = 15,
+        keep_alive_timeout: int = 30,
     ):
         if not isinstance(port, int):
             raise ValueError("Port must be an integer.")
@@ -38,7 +39,7 @@ class HttpServer:
         self.buffer_size = buffer_size
         self.keep_alive_timeout = keep_alive_timeout
         self._shutdown_event = asyncio.Event()
-        self.logger = None
+        self.logger = logger
 
     async def _handle_client(self, reader, writer):
         try:
@@ -54,36 +55,52 @@ class HttpServer:
                 await writer.wait_closed()
 
     async def _process_request(self, reader, writer):
-        # Ensures that the request is processed within the timeout
         try:
-            await asyncio.wait_for(
-                self._handle_request_logic(reader, writer),
-                timeout=self.keep_alive_timeout,
-            )
-        except asyncio.TimeoutError:
-            response = HttpResponse(status_code=408, body="Request Timeout")
-            await self._send_response(writer, response)
+            await self._handle_request_logic(reader, writer)
+        except Exception as e:
+            if isinstance(e, ConnectionResetError):
+                self.log("debug", f"Connection reset by peer: {e}")
+            else:
+                self.log("error", f"Error processing request: {e}")
+                response = HttpResponse(status_code=500, body="Internal Server Error")
+                await self._send_response(writer, response)
 
     async def _handle_request_logic(self, reader, writer):
         while True:
             try:
-                request_line = await asyncio.wait_for(
-                    reader.readline(), timeout=self.keep_alive_timeout
+                data = await asyncio.wait_for(
+                    reader.readuntil(b'\r\n\r\n'), timeout=self.keep_alive_timeout
                 )
             except asyncio.TimeoutError:
-                break  # No new request received within the keep-alive timeout
+                break
+            except asyncio.IncompleteReadError:
+                break
+            except asyncio.LimitOverrunError:
+                response = HttpResponse(status_code=413, body="Payload Too Large")
+                await self._send_response(writer, response)
+                break
 
-            if not request_line:
-                break  # Client closed the connection
-
-            method, path, _ = request_line.decode("utf-8").strip().split(" ")
-            headers = await self._parse_headers(reader)
-
-            request = self.request_factory.create(method, path, headers)
-
-            handler, path_params, is_async = self.router.get_handler(method, path)
+            if not data:
+                break
 
             try:
+                headers_end = data.find(b'\r\n\r\n')
+                header_data = data[:headers_end].decode('utf-8')
+                lines = header_data.split('\r\n')
+                request_line = lines[0]
+                header_lines = lines[1:]
+
+                method, path, _ = request_line.strip().split(" ")
+                headers = {}
+                for line in header_lines:
+                    if ': ' in line:
+                        header_name, header_value = line.strip().split(": ", 1)
+                        headers[header_name] = header_value
+
+                request = self.request_factory.create(method, path, headers)
+
+                handler, path_params, is_async = self.router.get_handler(method, path)
+
                 if not handler:
                     raise NotFoundError()
 
@@ -93,10 +110,11 @@ class HttpServer:
                     response = handler(request, **path_params)
             except HttpError as e:
                 # Handles web exceptions raised by the handler
-                response = HttpResponse(status_code=e.status_code, body=e)
+                response = HttpResponse(status_code=e.status_code, body=str(e))
             except Exception as e:
                 # Handles all other exceptions
                 response = HttpResponse(status_code=500, body="Internal Server Error")
+                self.log("error", f"Exception in request handling: {e}")
 
             await self._send_response(writer, response)
 
@@ -119,6 +137,8 @@ class HttpServer:
     async def _send_response(self, writer, response):
         if not isinstance(response, HttpResponse):
             response = HttpResponse(body=response)
+
+        # TODO: Add interceptor component here
 
         buffer = response.format_response()
         writer.write(buffer)

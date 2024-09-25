@@ -1,4 +1,4 @@
 apscheduler
 jinja2
 setuptools
-asyncio
+orjson >= 3.10.7

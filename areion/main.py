@@ -118,12 +118,14 @@ class AreionServer:
 
         self._start_orchestrator_in_thread()
 
+        # TODO: Allow setting of max_conns, buffer_size, and keep_alive_timeout in builder and pass through here
         # Add the HTTP Server
         self.http_server = HttpServer(
             router=self.router,
             host=self.host,
             port=self.port,
             request_factory=self.request_factory,
+            logger=self.logger,
         )
 
         # Start the HTTP server
