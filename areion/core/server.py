@@ -14,7 +14,7 @@ class HttpServer:
         port: int = 8080,
         max_conns: int = 1000,
         buffer_size: int = 8192,
-        keep_alive_timeout: int = 5,
+        keep_alive_timeout: int = 15,
     ):
         if not isinstance(port, int):
             raise ValueError("Port must be an integer.")
@@ -41,19 +41,20 @@ class HttpServer:
         self.logger = None
 
     async def _handle_client(self, reader, writer):
-        async with self.semaphore:
-            try:
-                await self._process_request(reader, writer)
-            except Exception as e:
+        try:
+            await self._process_request(reader, writer)
+        except Exception as e:
+            if isinstance(e, ConnectionResetError):
+                self.log("debug", f"Connection reset by peer: {e}")
+            else:
                 self.log("error", f"Error processing request: {e}")
-            finally:
+        finally:
+            if not writer.is_closing():
                 writer.close()
                 await writer.wait_closed()
 
     async def _process_request(self, reader, writer):
         # Ensures that the request is processed within the timeout
-        # TODO: Move request and client timeouts to separate variables
-        # TODO: Add optional request logging (add as middleware instead?)
         try:
             await asyncio.wait_for(
                 self._handle_request_logic(reader, writer),
@@ -66,13 +67,15 @@ class HttpServer:
     async def _handle_request_logic(self, reader, writer):
         while True:
             try:
-                request_line = await asyncio.wait_for(reader.readline(), timeout=self.keep_alive_timeout)
+                request_line = await asyncio.wait_for(
+                    reader.readline(), timeout=self.keep_alive_timeout
+                )
             except asyncio.TimeoutError:
                 break  # No new request received within the keep-alive timeout
 
             if not request_line:
                 break  # Client closed the connection
-            
+
             method, path, _ = request_line.decode("utf-8").strip().split(" ")
             headers = await self._parse_headers(reader)
 
@@ -96,8 +99,11 @@ class HttpServer:
                 response = HttpResponse(status_code=500, body="Internal Server Error")
 
             await self._send_response(writer, response)
-            
-            if 'Connection' in request.headers and request.headers['Connection'].lower() == 'close':
+
+            if (
+                "Connection" in request.headers
+                and request.headers["Connection"].lower() == "close"
+            ):
                 break
 
     async def _parse_headers(self, reader):

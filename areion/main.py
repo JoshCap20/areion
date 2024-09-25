@@ -129,9 +129,6 @@ class AreionServer:
         # Start the HTTP server
         server_task = asyncio.create_task(self.http_server.start())
 
-        # self.logger.info(f"Server running on http://{self.host}:{self.port}")
-        # self.logger.debug(f"Available Routes and Handlers: {self.router.routes}")
-        
         # Wait for shutdown signal
         await self._shutdown_event.wait()
 
