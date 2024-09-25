@@ -1,3 +1,6 @@
+from .response import HttpResponse
+
+
 class HttpRequest:
     def __init__(
         self, method, path, headers, logger=None, engine=None, orchestrator=None
@@ -66,7 +69,8 @@ class HttpRequest:
             raise ValueError("No template engine available to render the template.")
         if context is None:
             context = {}
-        return self.engine.render(template_name, context)
+        template = self.engine.render(template_name, context)
+        return HttpResponse(content_type="text/html", body=template)
 
     def submit_task(self, task: callable, *args):
         """
@@ -98,10 +102,12 @@ class HttpRequest:
             log_method = getattr(self.logger, level, None)
             if log_method:
                 log_method(message)
+        else:
+            print(f"[{level.upper()}] {message}")
 
     def __repr__(self) -> str:
         return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
-    
+
     def __str__(self) -> str:
         return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
 

@@ -10,19 +10,16 @@ DEFAULT_HOST = "localhost"
 AREION_LOGO = """
            >>\\.
           /_  )`.
-         /  _)`^)`.   _.---. _ 
-        (_,' \\  `^-)""      `.\\
+         /  _)`^)`.   _.---._  
+        (_,' \\  `^-)""      `.\
               |           | \\ \\--._
-             /   /  /     | | |
-            /   /  /      | | |
-        ___/___/__/_______|_|__\\______
-       /                              \\
-      /         A R E I O N            \\
-     /__________________________________\\
-      | | |                        | | |
-      | | |                        | | |
-      |_|_|________________________|_|_|
-      \\_\\_\\                        /_/_/
+             /   /  /-----| | | |
+            /   /  /      | | | |
+         __/___/__/_______|_|__\_\___
+        //                          \\
+       //       A R E I O N          \\
+      //      joshcap20/areion        \\
+     //________________________________\\
 """
 
 
@@ -245,6 +242,9 @@ class AreionServerBuilder:
         self.logger = None
         self.engine = None
         self.static_dir = None
+        # Development Only
+        self.development_mode = False
+        self.swagger_handler = None
 
     def with_host(self, host: str):
         if not isinstance(host, str):
@@ -292,6 +292,12 @@ class AreionServerBuilder:
         self.static_dir = static_dir
         return self
 
+    def with_development_mode(self, development_mode: bool = False):
+        if not isinstance(development_mode, bool):
+            raise ValueError("Development mode flag must be a boolean.")
+        self.development_mode = development_mode
+        return self
+
     def _validate_component(self, component, required_methods, component_name):
         if not all(hasattr(component, method) for method in required_methods):
             raise ValueError(
@@ -319,14 +325,19 @@ class AreionServerBuilder:
         if not self.router:
             raise ValueError("Router is required.")
 
-        request_factory = HttpRequestFactory(
-            logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
-        )
-
         self._initialize_logger()
 
         if self.orchestrator:
             self.orchestrator.set_logger(self.logger)
+
+        request_factory = HttpRequestFactory(
+            logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
+        )
+
+        if self.development_mode:
+            from .dev.swagger import SwaggerHandler
+
+            self.swagger_handler = SwaggerHandler(self.router)
 
         return AreionServer(
             host=self.host,

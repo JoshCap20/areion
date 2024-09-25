@@ -3,6 +3,25 @@ from ..base import BaseLogger
 
 
 class Logger(BaseLogger):
+    """
+    Logger class for handling logging with both console and file output.
+    Attributes:
+        logger (logging.Logger): The logger instance used for logging messages.
+    Methods:
+        __init__(log_file=None, log_level=logging.INFO):
+            Initializes the Logger instance with optional file logging and specified log level.
+        info(message: str) -> None:
+            Logs an informational message.
+        debug(message: str) -> None:
+            Logs a debug message.
+        error(message: str) -> None:
+            Logs an error message.
+        warning(message: str) -> None:
+            Logs a warning message.
+        critical(message: str) -> None:
+            Logs a critical message.
+    """
+
     def __init__(self, log_file=None, log_level=logging.INFO):
         self.logger = logging.getLogger("areion")
         self.logger.setLevel(log_level)
@@ -31,6 +50,6 @@ class Logger(BaseLogger):
 
     def warning(self, message: str) -> None:
         self.logger.warning(message)
-        
+
     def critical(self, message: str) -> None:
         self.logger.critical(message)

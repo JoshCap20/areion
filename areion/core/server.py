@@ -38,6 +38,7 @@ class HttpServer:
         self.buffer_size = buffer_size
         self.keep_alive_timeout = keep_alive_timeout
         self._shutdown_event = asyncio.Event()
+        self.logger = None
 
     async def _handle_client(self, reader, writer, timeout: int = 15) -> None:
         # Handles client connections
@@ -80,7 +81,7 @@ class HttpServer:
         try:
             if not handler:
                 raise NotFoundError()
-        
+
             if is_async:
                 response = await handler(request, **path_params)
             else:
@@ -138,3 +139,11 @@ class HttpServer:
             await self.start()
         except (KeyboardInterrupt, SystemExit):
             await self.stop()
+
+    def log(self, level: str, message: str) -> None:
+        if self.logger:
+            log_method = getattr(self.logger, level, None)
+            if log_method:
+                log_method(message)
+        else:
+            print(f"{level.upper()}: {message}")
