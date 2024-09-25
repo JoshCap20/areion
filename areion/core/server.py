@@ -40,15 +40,12 @@ class HttpServer:
         self._shutdown_event = asyncio.Event()
         self.logger = None
 
-    async def _handle_client(self, reader, writer, timeout: int = 15) -> None:
-        # Handles client connections
+    async def _handle_client(self, reader, writer):
         async with self.semaphore:
             try:
-                await asyncio.wait_for(
-                    self._process_request(reader, writer), timeout=timeout
-                )
-            except asyncio.TimeoutError:
-                pass
+                await self._process_request(reader, writer)
+            except Exception as e:
+                self.log("error", f"Error processing request: {e}")
             finally:
                 writer.close()
                 await writer.wait_closed()
@@ -67,33 +64,41 @@ class HttpServer:
             await self._send_response(writer, response)
 
     async def _handle_request_logic(self, reader, writer):
-        request_line = await reader.readline()
-        if not request_line:
-            return
+        while True:
+            try:
+                request_line = await asyncio.wait_for(reader.readline(), timeout=self.keep_alive_timeout)
+            except asyncio.TimeoutError:
+                break  # No new request received within the keep-alive timeout
 
-        method, path, _ = request_line.decode("utf-8").strip().split(" ")
-        headers = await self._parse_headers(reader)
+            if not request_line:
+                break  # Client closed the connection
+            
+            method, path, _ = request_line.decode("utf-8").strip().split(" ")
+            headers = await self._parse_headers(reader)
 
-        request = self.request_factory.create(method, path, headers)
+            request = self.request_factory.create(method, path, headers)
 
-        handler, path_params, is_async = self.router.get_handler(method, path)
+            handler, path_params, is_async = self.router.get_handler(method, path)
 
-        try:
-            if not handler:
-                raise NotFoundError()
+            try:
+                if not handler:
+                    raise NotFoundError()
 
-            if is_async:
-                response = await handler(request, **path_params)
-            else:
-                response = handler(request, **path_params)
-        except HttpError as e:
-            # Handles web exceptions raised by the handler
-            response = HttpResponse(status_code=e.status_code, body=e)
-        except Exception as e:
-            # Handles all other exceptions
-            response = HttpResponse(status_code=500, body="Internal Server Error")
+                if is_async:
+                    response = await handler(request, **path_params)
+                else:
+                    response = handler(request, **path_params)
+            except HttpError as e:
+                # Handles web exceptions raised by the handler
+                response = HttpResponse(status_code=e.status_code, body=e)
+            except Exception as e:
+                # Handles all other exceptions
+                response = HttpResponse(status_code=500, body="Internal Server Error")
 
-        await self._send_response(writer, response)
+            await self._send_response(writer, response)
+            
+            if 'Connection' in request.headers and request.headers['Connection'].lower() == 'close':
+                break
 
     async def _parse_headers(self, reader):
         headers = {}
@@ -106,17 +111,11 @@ class HttpServer:
         return headers
 
     async def _send_response(self, writer, response):
-        # TODO: Add optional response logging
         if not isinstance(response, HttpResponse):
             response = HttpResponse(body=response)
 
         buffer = response.format_response()
-        chunk_size = self.buffer_size
-
-        for i in range(0, len(buffer), chunk_size):
-            writer.write(buffer[i : i + chunk_size])
-            await writer.drain()
-
+        writer.write(buffer)
         await writer.drain()
 
     async def start(self):
@@ -128,11 +127,9 @@ class HttpServer:
             await self._shutdown_event.wait()
 
     async def stop(self):
-        # Handles server shutdown
-        if self._server:
-            self._server.close()
-            await self._server.wait_closed()
-        self._shutdown_event.set()
+        if self.server:
+            self.server.close()
+            await self.server.wait_closed()
 
     async def run(self, *args, **kwargs):
         try:
