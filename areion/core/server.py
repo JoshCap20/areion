@@ -120,6 +120,8 @@ class HttpServer:
         if not isinstance(response, HttpResponse):
             response = HttpResponse(body=response)
 
+        # TODO: Add interceptor component here
+        
         buffer = response.format_response()
         writer.write(buffer)
         await writer.drain()

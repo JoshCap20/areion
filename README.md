@@ -22,13 +22,13 @@ We conducted performance benchmarks to compare Areion with FastAPI, focusing on 
 Running 30s test @ http://localhost:8000/json
   12 threads and 400 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     7.15ms    1.34ms  38.99ms   97.58%
-    Req/Sec     4.66k   336.44     8.89k    92.00%
-  1,668,675 requests in 30.03s, 157.53MB read
-  Socket errors: connect 0, read 2,622, write 0, timeout 0
-  Non-2xx or 3xx responses: 1,980
-Requests/sec:  55,566.74
-Transfer/sec:      5.25MB
+    Latency     7.41ms    2.82ms  50.61ms   93.04%
+    Req/Sec     4.57k   696.46     6.30k    84.17%
+  1,637,309 requests in 30.05s, 154.58MB read
+  Socket errors: connect 0, read 944, write 0, timeout 0
+  Non-2xx or 3xx responses: 405
+Requests/sec:  54,489.45
+Transfer/sec:      5.14MB
 ```
 
 #### FastAPI
