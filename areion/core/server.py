@@ -10,6 +10,7 @@ class HttpServer:
         self,
         router,
         request_factory,
+        logger=None,
         host: str = "localhost",
         port: int = 8080,
         max_conns: int = 1000,
@@ -38,7 +39,7 @@ class HttpServer:
         self.buffer_size = buffer_size
         self.keep_alive_timeout = keep_alive_timeout
         self._shutdown_event = asyncio.Event()
-        self.logger = None
+        self.logger = logger
 
     async def _handle_client(self, reader, writer):
         try:
