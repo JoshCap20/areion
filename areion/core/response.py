@@ -1,4 +1,4 @@
-import json
+import orjson
 
 HTTP_STATUS_CODES: dict[int, str] = {
     100: "Continue",
@@ -111,7 +111,7 @@ class HttpResponse:
             str or bytes: The formatted body.
         """
         if isinstance(self.body, dict):
-            return json.dumps(self.body).encode("utf-8")  # Convert dict to JSON
+            return orjson.dumps(self.body)
         elif isinstance(self.body, str):
             return self.body.encode("utf-8")  # Convert string to bytes
         elif isinstance(self.body, bytes):
