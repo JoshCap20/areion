@@ -75,7 +75,6 @@ class HttpServer:
             except asyncio.IncompleteReadError:
                 break
             except asyncio.LimitOverrunError:
-                # TODO: Move to exceptions
                 response = HttpResponse(status_code=413, body="Payload Too Large")
                 await self._send_response(writer, response)
                 break
