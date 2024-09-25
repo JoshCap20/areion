@@ -54,15 +54,15 @@ class HttpServer:
                 await writer.wait_closed()
 
     async def _process_request(self, reader, writer):
-        # Ensures that the request is processed within the timeout
         try:
-            await asyncio.wait_for(
-                self._handle_request_logic(reader, writer),
-                timeout=self.keep_alive_timeout,
-            )
-        except asyncio.TimeoutError:
-            response = HttpResponse(status_code=408, body="Request Timeout")
-            await self._send_response(writer, response)
+            await self._handle_request_logic(reader, writer)
+        except Exception as e:
+            if isinstance(e, ConnectionResetError):
+                self.log("debug", f"Connection reset by peer: {e}")
+            else:
+                self.log("error", f"Error processing request: {e}")
+                response = HttpResponse(status_code=500, body="Internal Server Error")
+                await self._send_response(writer, response)
 
     async def _handle_request_logic(self, reader, writer):
         while True:
@@ -121,7 +121,7 @@ class HttpServer:
             response = HttpResponse(body=response)
 
         # TODO: Add interceptor component here
-        
+
         buffer = response.format_response()
         writer.write(buffer)
         await writer.drain()
