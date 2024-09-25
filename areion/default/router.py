@@ -7,6 +7,8 @@ class Router:
         self.allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH"]
         self.middlewares = {}
         self.global_middlewares = []
+        self.route_info = []
+        self.logger = None
 
     def add_route(self, path, handler, methods=["GET"], middlewares=None):
         segments = self._split_path(path)
@@ -31,7 +33,17 @@ class Router:
             current_node.handler[method] = {
                 "handler": wrapped_handler,
                 "is_async": iscoroutinefunction(handler),
+                "middlewares": middlewares,
+                "doc": handler.__doc__,
             }
+
+            self.route_info.append({
+                'path': path,
+                'method': method,
+                'handler': handler,
+                'middlewares': middlewares,
+                'doc': handler.__doc__,
+            })
 
     def group(self, base_path, middlewares=None):
         """
