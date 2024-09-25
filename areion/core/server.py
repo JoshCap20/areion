@@ -14,7 +14,7 @@ class HttpServer:
         port: int = 8080,
         max_conns: int = 1000,
         buffer_size: int = 8192,
-        keep_alive_timeout: int = 15,
+        keep_alive_timeout: int = 30,
     ):
         if not isinstance(port, int):
             raise ValueError("Port must be an integer.")
