@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock
-from ... import HttpRequest, HttpRequestFactory
+from ... import HttpRequest, HttpRequestFactory, HttpResponse
 
 
 class TestHttpRequest(unittest.TestCase):
@@ -129,7 +129,9 @@ class TestHttpRequest(unittest.TestCase):
         mock_engine.render.return_value = "Rendered Content"
         self.request.engine = mock_engine
         result = self.request.render_template("template.html", {"key": "value"})
-        self.assertEqual(result, "Rendered Content")
+        # assert is instance HttpResponse and has the return value as the body
+        assert isinstance(result, HttpResponse)
+        self.assertEqual(result.body, "Rendered Content")
         mock_engine.render.assert_called_once_with("template.html", {"key": "value"})
 
     def test_render_template_no_engine(self):
@@ -146,7 +148,8 @@ class TestHttpRequest(unittest.TestCase):
         mock_engine.render.return_value = "Rendered Content"
         self.request.engine = mock_engine
         result = self.request.render_template("template.html")
-        self.assertEqual(result, "Rendered Content")
+        assert isinstance(result, HttpResponse)
+        self.assertEqual(result.body, "Rendered Content")
         mock_engine.render.assert_called_once_with("template.html", {})
 
     def test_submit_task(self):
