@@ -10,19 +10,16 @@ DEFAULT_HOST = "localhost"
 AREION_LOGO = """
            >>\\.
           /_  )`.
-         /  _)`^)`.   _.---. _ 
-        (_,' \\  `^-)""      `.\\
+         /  _)`^)`.   _.---._  
+        (_,' \\  `^-)""      `.\
               |           | \\ \\--._
-             /   /  /     | | |
-            /   /  /      | | |
-        ___/___/__/_______|_|__\\______
-       /                              \\
-      /         A R E I O N            \\
-     /__________________________________\\
-      | | |                        | | |
-      | | |                        | | |
-      |_|_|________________________|_|_|
-      \\_\\_\\                        /_/_/
+             /   /  /-----| | | |
+            /   /  /      | | | |
+         __/___/__/_______|_|__\_\___
+        //                          \\
+       //       A R E I O N          \\
+      //      joshcap20/areion        \\
+     //________________________________\\
 """
 
 
@@ -319,14 +316,14 @@ class AreionServerBuilder:
         if not self.router:
             raise ValueError("Router is required.")
 
-        request_factory = HttpRequestFactory(
-            logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
-        )
-
         self._initialize_logger()
 
         if self.orchestrator:
             self.orchestrator.set_logger(self.logger)
+            
+        request_factory = HttpRequestFactory(
+            logger=self.logger, engine=self.engine, orchestrator=self.orchestrator
+        )
 
         return AreionServer(
             host=self.host,

@@ -98,10 +98,12 @@ class HttpRequest:
             log_method = getattr(self.logger, level, None)
             if log_method:
                 log_method(message)
+        else:
+            print(f"[{level.upper()}] {message}")
 
     def __repr__(self) -> str:
         return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
-    
+
     def __str__(self) -> str:
         return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
 

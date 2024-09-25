@@ -13,8 +13,9 @@ class Orchestrator(BaseOrchestrator):
         self.logger = None  # Builder injects logger component
 
     def start(self) -> None:
-        self.logger.info(
-            f"Orchestrator started. Thread pool initialized with {self.executor._max_workers} workers."
+        self.log(
+            "info",
+            f"Orchestrator started. Thread pool initialized with {self.executor._max_workers} workers.",
         )
         self.scheduler.start()
         self.run_tasks()  # Run any pending tasks immediately
@@ -23,20 +24,32 @@ class Orchestrator(BaseOrchestrator):
         task_name = getattr(func, "__name__", "unnamed_task")
         future = self.executor.submit(func, *args)
         self.tasks.append(future)
-        self.logger.info(f"Task {task_name} submitted.")
+        self.log(
+            "info",
+            f"Task {task_name} submitted.",
+        )
         return future
 
     def set_logger(self, logger) -> None:
         self.logger = logger
 
     def run_tasks(self) -> None:
-        self.logger.info("Running tasks concurrently.")
+        self.log(
+            "info",
+            f"Running {len(self.tasks)} tasks concurrently.",
+        )
         for future in as_completed(self.tasks):
             try:
                 result = future.result()
-                self.logger.debug(f"Task completed with result: {result}")
+                self.log(
+                    "info",
+                    f"Task completed with result: {result}",
+                )
             except Exception as e:
-                self.logger.error(f"Task generated an exception: {e}")
+                self.log(
+                    "error",
+                    f"Task generated an exception: {e}",
+                )
 
     def schedule_cron_task(self, func, cron_expression, *args) -> None:
         if not all(
@@ -46,8 +59,9 @@ class Orchestrator(BaseOrchestrator):
             raise ValueError("Invalid cron expression")
 
         task_name = getattr(func, "__name__", "unnamed_task")
-        self.logger.info(
-            f"Scheduling task {task_name} with cron expression: {cron_expression}"
+        self.log(
+            "info",
+            f"Scheduling task {task_name} with cron expression: {cron_expression}",
         )
         self.scheduler.add_job(func, "cron", *args, id=task_name, **cron_expression)
 
@@ -55,3 +69,12 @@ class Orchestrator(BaseOrchestrator):
         # TODO: Orchestrator clean up work here
         self.scheduler.shutdown(wait=False)
         self.executor.shutdown(wait=True)
+
+    def log(self, level: str, message: str) -> None:
+        # Safe logging method (bug fix for scheduled tasks before server is ran)
+        if self.logger:
+            log_method = getattr(self.logger, level, None)
+            if log_method:
+                log_method(message)
+        else:
+            print(f"[{level.upper()}] {message}")

@@ -143,6 +143,15 @@ class Router:
 
         return handler
 
+    def log(self, level: str, message: str) -> None:
+        # Safe logging method (bug fix for scheduled tasks before server is ran)
+        if self.logger:
+            log_method = getattr(self.logger, level, None)
+            if log_method:
+                log_method(message)
+        else:
+            print(f"[{level.upper()}] {message}")
+
 
 """
 Router Utility Classes
