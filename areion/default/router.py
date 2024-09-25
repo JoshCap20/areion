@@ -1,43 +1,37 @@
-import json
-from http.server import BaseHTTPRequestHandler
+from asyncio import iscoroutinefunction
 
 
 class Router:
     def __init__(self):
-        self.routes = {}
+        self.root = TrieNode()
         self.allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH"]
         self.middlewares = {}
         self.global_middlewares = []
 
     def add_route(self, path, handler, methods=["GET"], middlewares=None):
-        """
-        Adds a route to the router and optionally attaches middlewares.
-
-        Args:
-            path (str): The URL path for the route.
-            handler (callable): The function to handle requests to the route.
-            methods (list, optional): A list of HTTP methods that the route should respond to. Defaults to ["GET"].
-            middlewares (list, optional): A list of middleware functions for this route.
-        """
-        methods = [
-            method.upper()
-            for method in methods
-            if method.upper() in self.allowed_methods
-        ]
-        normalized_path = path.rstrip("/") if path != "/" else path
-
-        if not methods:
-            raise ValueError(
-                "At least one valid HTTP method must be provided per route."
-            )
-
-        if normalized_path not in self.routes:
-            self.routes[normalized_path] = {}
+        segments = self._split_path(path)
+        current_node = self.root
+        for segment in segments:
+            if segment.startswith(":"):  # Dynamic path segment
+                if current_node.dynamic_child is None:
+                    current_node.dynamic_child = TrieNode()
+                    current_node.dynamic_child.param_name = segment[1:]
+                current_node = current_node.dynamic_child
+            else:  # Static path segment
+                if segment not in current_node.children:
+                    current_node.children[segment] = TrieNode()
+                current_node = current_node.children[segment]
 
         for method in methods:
-            self.routes[normalized_path][method] = handler
-            if middlewares:
-                self.middlewares[(method, normalized_path)] = middlewares
+            combined_middlewares = self.global_middlewares + (middlewares or [])
+            wrapped_handler = handler
+            for middleware in reversed(combined_middlewares):
+                wrapped_handler = middleware(wrapped_handler)
+
+            current_node.handler[method] = {
+                "handler": wrapped_handler,
+                "is_async": iscoroutinefunction(handler),
+            }
 
     def group(self, base_path, middlewares=None):
         """
@@ -86,25 +80,30 @@ class Router:
         return decorator
 
     def get_handler(self, method, path):
-        """
-        Retrieves the appropriate route handler based on method and path, and applies middleware.
+        segments = self._split_path(path)
+        current_node = self.root
+        path_params = {}
 
-        Args:
-            method (str): HTTP method.
-            path (str): Request path.
+        for segment in segments:
+            if segment in current_node.children:
+                current_node = current_node.children[segment]
+            elif current_node.dynamic_child:  # Match dynamic segments
+                param_node = current_node.dynamic_child
+                path_params[param_node.param_name] = segment  # Store dynamic param
+                current_node = param_node
+            else:
+                return None, None, None
 
-        Returns:
-            tuple: (handler, path_params) if a route is matched; otherwise (None, None).
-        """
-        normalized_path = path.rstrip("/") if path != "/" else path
-        if normalized_path in self.routes and method in self.routes[normalized_path]:
-            handler = self.routes[normalized_path][method]
-            handler_with_middlewares = self._apply_middlewares(
-                handler, method, normalized_path
-            )
-            path_params = {}  # TODO
-            return handler_with_middlewares, path_params
-        return None, None
+        if method in current_node.handler:
+            handler_info = current_node.handler[method]
+            is_async = handler_info["is_async"]
+            return handler_info["handler"], path_params, is_async
+
+        return None, None, None
+
+    def _split_path(self, path):
+        """Splits a path into segments and normalizes it."""
+        return [segment for segment in path.strip("/").split("/") if segment]
 
     ### Middleware Handling ###
 
@@ -112,23 +111,47 @@ class Router:
         """Adds a middleware that will be applied globally to all routes."""
         self.global_middlewares.append(middleware)
 
-    def _apply_middlewares(self, handler, method, path) -> callable:
+    def _apply_middlewares(self, handler_info, method, path) -> callable:
         """
         Applies the middleware chain to the handler for the given method and path.
-        Global middlewares are applied first, followed by route-specific middlewares.
+        All middlewares are assumed to be synchronous.
+
         Args:
-            handler (callable): The route handler function.
+            handler_info (dict): The route handler information containing the handler function and middlewares.
             method (str): HTTP method.
             path (str): Request path.
+
         Returns:
             callable: The final handler with middleware applied.
         """
-        middlewares = self.global_middlewares[:]
+        handler = handler_info["handler"]
+        is_async = handler_info["is_async"]
 
-        route_middlewares = self.middlewares.get((method, path), [])
+        middlewares = self.global_middlewares[:]
+        route_middlewares = handler_info.get("middlewares", [])
         middlewares.extend(route_middlewares)
 
-        # Wrap the handler with all middlewares in reverse order
         for middleware in reversed(middlewares):
             handler = middleware(handler)
+
+        if is_async:
+
+            async def async_wrapper(*args, **kwargs):
+                return await handler(*args, **kwargs)
+
+            return async_wrapper
+
         return handler
+
+
+"""
+Router Utility Classes
+"""
+
+
+class TrieNode:
+    def __init__(self):
+        self.children = {}
+        self.handler = {}
+        self.dynamic_child = None
+        self.param_name = None

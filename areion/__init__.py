@@ -12,6 +12,13 @@ from .core import (
     HttpRequestFactory,
     HttpServer,
     HTTP_STATUS_CODES,
+    HttpError,
+    BadRequestError,
+    UnauthorizedError,
+    ForbiddenError,
+    NotFoundError,
+    MethodNotAllowedError,
+    InternalServerError,
 )
 
 from .base import BaseEngine, BaseLogger, BaseOrchestrator, BaseRouter, BaseMiddleware
@@ -37,4 +44,12 @@ __all__ = [
     "BaseOrchestrator",
     "BaseRouter",
     "BaseMiddleware",
+    # Exceptions and Status Codes
+    "HttpError",
+    "BadRequestError",
+    "UnauthorizedError",
+    "ForbiddenError",
+    "NotFoundError",
+    "MethodNotAllowedError",
+    "InternalServerError",
 ]
