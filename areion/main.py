@@ -127,17 +127,14 @@ class AreionServer:
         )
 
         # Start the HTTP server
-        server_task = await self.http_server.run()
-
-        self.logger.info(f"Server running on http://{self.host}:{self.port}")
-        self.logger.debug(f"Available Routes and Handlers: {self.router.routes}")
+        server_task = asyncio.create_task(self.http_server.start())
 
         # Wait for shutdown signal
         await self._shutdown_event.wait()
 
-        self.logger.info("AerionSever shutdown initiated.")
-        await self.shutdown(server_task)
-        self.logger.info("AerionServer shutdown complete.")
+        # Shutdown the HTTP server
+        await self.http_server.stop()
+        await server_task
 
     async def shutdown(self, server_task):
         """

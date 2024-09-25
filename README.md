@@ -10,6 +10,67 @@ We designed Areion to have as few dependencies as possible. We created our own H
 
 **Development Mode:** Add the flag `with_development_mode(True)` to the `AreionServerBuilder` to enable development mode. This mode will automatically add Swagger UI and OpenAPI routes to your server. They are accessible from the routes `/docs` and `/openapi` respectively.
 
+## Benchmark
+
+We conducted performance benchmarks to compare Areion with FastAPI, focusing on throughput and latency under high-load conditions. The goal was to evaluate Areion's ability to handle concurrent connections efficiently and provide fast response times. We used the same JSON response in all frameworks to ensure a fair comparison.
+
+## Benchmark Results
+
+#### Areion
+
+```bash
+Running 30s test @ http://localhost:8000/json
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     7.15ms    1.34ms  38.99ms   97.58%
+    Req/Sec     4.66k   336.44     8.89k    92.00%
+  1,668,675 requests in 30.03s, 157.53MB read
+  Socket errors: connect 0, read 2,622, write 0, timeout 0
+  Non-2xx or 3xx responses: 1,980
+Requests/sec:  55,566.74
+Transfer/sec:      5.25MB
+```
+
+#### FastAPI
+
+```bash
+Running 30s test @ http://localhost:8000/json
+  12 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    73.42ms   10.92ms 190.27ms   89.45%
+    Req/Sec   450.92     71.28   653.00     73.33%
+  161,989 requests in 30.10s, 23.48MB read
+  Socket errors: connect 0, read 418, write 0, timeout 0
+Requests/sec:   5,381.16
+Transfer/sec:    798.78KB
+```
+
+### Analysis
+
+#### Throughput (Requests per Second)
+
+Areion: 55,566.74 requests/sec  
+FastAPI: 5,381.16 requests/sec  
+Areion handled approximately 10 times more requests per second than FastAPI.
+
+#### Average Latency
+
+Areion: 7.15 ms  
+FastAPI: 73.42 ms  
+Areion's average latency is about 10 times lower than FastAPI's, indicating faster response times.
+
+#### Total Requests Handled
+
+Areion: 1,668,675 requests  
+FastAPI: 161,989 requests  
+Areion processed significantly more total requests during the test duration.
+
+#### Socket Errors
+
+Areion: 2,622 read errors  
+FastAPI: 418 read errors  
+Areion encountered more socket read errors due to the higher number of connections and requests.
+
 ## Table of Contents
 
 - [Getting Started](#getting-started)
