@@ -34,8 +34,8 @@ classifiers = [
 ]
 dependencies = [
     "jinja2>=3.0.0",
-    "apscheduler>=3.0.0"
-    "orjson==3.10.7",
+    "apscheduler>=3.0.0",
+    "orjson==3.10.7"
 ]
 
 [project.urls]
