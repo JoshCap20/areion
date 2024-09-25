@@ -8,11 +8,14 @@ Areion supports asynchronous operations, multithreading, routing, orchestration,
 
 We designed Areion to have as few dependencies as possible. We created our own HTTP server on top of asyncio's sockets. While we dream of being the fastest, most preferred Python web server, we know we have a long way to go. We are still in the early stages of development, and we welcome any feedback, contributions, or suggestions. The documentation below is likely to become outdated as we continue to migrate to v2.0.0 which will feature a whole documentation site with more examples, tutorials, and guides.
 
+**Development Mode:** Add the flag `with_development_mode(True)` to the `AreionServerBuilder` to enable development mode. This mode will automatically add Swagger UI and OpenAPI routes to your server. They are accessible from the routes `/docs` and `/openapi` respectively.
+
 ## Table of Contents
 
 - [Getting Started](#getting-started)
   - [Installation](#installation)
   - [Quick Start Guide](#quick-start-guide)
+  - [Enabling Development Tools](#enabling-development-tools)
 - [Core Components](#core-components)
   - [AreionServer](#areionserver)
   - [Router](#router)
@@ -73,6 +76,23 @@ server.run()
 - **Defining Routes:** Using the @router.route decorator, we define a route that responds to /hello.
 - **Server Building:** We use AreionServerBuilder to construct the server with the router.
 - **Running the Server:** The server.run() method starts the server synchronously.
+
+### Development Tools
+
+Development tools are essential to increasing development ease and efficiency. With this in mind, we also don't want to slow down the server in production. To enable development tools, add the `with_development_mode(True)` flag to the `AreionServerBuilder`.
+
+**Development Tools:**
+
+- **Swagger UI:** Provides an interactive API documentation interface.
+- **OpenAPI Routes:** Exposes auto-generated OpenAPI schema and routes for API exploration.
+
+**Coming Soon:**
+
+- **Automatic Reload:** Automatically reloads the server on code changes.
+- **Debugging Tools:** Built-in debugging tools for inspecting requests and responses.
+- **Testing Tools:** Integration with testing frameworks for automated testing.
+- **Security Tools:** Security checks and recommendations for your server.
+- **Performance Tools:** Performance monitoring and optimization tools.
 
 ## Core Components
 
@@ -354,6 +374,7 @@ Builder class for constructing AreionServer instances.
 - `with_logger(logger)`: Sets the logger.
 - `with_engine(engine)`: Sets the template engine.
 - `with_static_dir(static_dir)`: Sets the static directory.
+- `with_development_mode(bool)`: Enables development mode and Swagger UI/OpenAPI routes.
 - `build()`: Builds and returns an AreionServer instance.
 
 ### Router API
