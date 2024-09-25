@@ -1,7 +1,8 @@
+import mimetypes
 import os
 import asyncio
 import threading
-from .core import HttpServer, HttpRequestFactory
+from .core import HttpServer, HttpRequestFactory, HttpResponse
 
 # Constants
 DEFAULT_PORT = 8080
@@ -109,6 +110,11 @@ class AreionServer:
         """
         Start the Areion server asynchronously
         """
+        if self.static_dir:
+            self.router.add_route(
+                "/static/:filename", self._static_file_handler, methods=["GET"]
+            )
+
         print(AREION_LOGO)
 
         self.logger.info(f"Starting server on {self.host}:{self.port}")
@@ -122,10 +128,6 @@ class AreionServer:
             port=self.port,
             request_factory=self.request_factory,
         )
-
-        # TODO: Attach static file handler here
-        if self.static_dir:
-            self._serve_static_files()
 
         # Start the HTTP server
         server_task = await self.http_server.run()
@@ -186,9 +188,24 @@ class AreionServer:
             except Exception as e:
                 self.logger.error(f"Orchestrator error: {e}")
 
-    def _serve_static_files(self):
-        # TODO: Implement serving static files
-        raise NotImplementedError("Serving static files is not yet implemented.")
+    async def _static_file_handler(self, request, filename):
+        """
+        Handles serving static files from the static directory.
+        """
+        file_path = os.path.join(self.static_dir, filename)
+
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
+            return HttpResponse(status_code=404, body="File Not Found")
+
+        mime_type, _ = mimetypes.guess_type(file_path)
+        mime_type = mime_type or "application/octet-stream"
+
+        with open(file_path, "rb") as file:
+            content = file.read()
+
+        return HttpResponse(
+            status_code=200, body=content, headers={"Content-Type": mime_type}
+        )
 
 
 class AreionServerBuilder:
