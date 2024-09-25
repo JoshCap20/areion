@@ -67,23 +67,40 @@ class HttpServer:
     async def _handle_request_logic(self, reader, writer):
         while True:
             try:
-                request_line = await asyncio.wait_for(
-                    reader.readline(), timeout=self.keep_alive_timeout
+                data = await asyncio.wait_for(
+                    reader.readuntil(b'\r\n\r\n'), timeout=self.keep_alive_timeout
                 )
             except asyncio.TimeoutError:
-                break  # No new request received within the keep-alive timeout
+                break
+            except asyncio.IncompleteReadError:
+                break
+            except asyncio.LimitOverrunError:
+                # TODO: Move to exceptions
+                response = HttpResponse(status_code=413, body="Payload Too Large")
+                await self._send_response(writer, response)
+                break
 
-            if not request_line:
-                break  # Client closed the connection
-
-            method, path, _ = request_line.decode("utf-8").strip().split(" ")
-            headers = await self._parse_headers(reader)
-
-            request = self.request_factory.create(method, path, headers)
-
-            handler, path_params, is_async = self.router.get_handler(method, path)
+            if not data:
+                break
 
             try:
+                headers_end = data.find(b'\r\n\r\n')
+                header_data = data[:headers_end].decode('utf-8')
+                lines = header_data.split('\r\n')
+                request_line = lines[0]
+                header_lines = lines[1:]
+
+                method, path, _ = request_line.strip().split(" ")
+                headers = {}
+                for line in header_lines:
+                    if ': ' in line:
+                        header_name, header_value = line.strip().split(": ", 1)
+                        headers[header_name] = header_value
+
+                request = self.request_factory.create(method, path, headers)
+
+                handler, path_params, is_async = self.router.get_handler(method, path)
+
                 if not handler:
                     raise NotFoundError()
 
@@ -93,10 +110,11 @@ class HttpServer:
                     response = handler(request, **path_params)
             except HttpError as e:
                 # Handles web exceptions raised by the handler
-                response = HttpResponse(status_code=e.status_code, body=e)
+                response = HttpResponse(status_code=e.status_code, body=str(e))
             except Exception as e:
                 # Handles all other exceptions
                 response = HttpResponse(status_code=500, body="Internal Server Error")
+                self.log("error", f"Exception in request handling: {e}")
 
             await self._send_response(writer, response)
 
