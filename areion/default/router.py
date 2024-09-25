@@ -2,6 +2,42 @@ from asyncio import iscoroutinefunction
 
 
 class Router:
+    """
+    Router class for managing HTTP routes and their handlers.
+
+    The Router class provides methods to add routes, group routes, and retrieve
+    handlers based on HTTP methods and paths. It supports both static and dynamic
+    path segments and allows for the application of middlewares at both global and
+    route-specific levels.
+
+    Attributes:
+        root (TrieNode): The root node of the routing trie.
+        allowed_methods (list): List of allowed HTTP methods.
+        middlewares (dict): Dictionary to store middlewares.
+        global_middlewares (list): List of global middlewares applied to all routes.
+        route_info (list): List of route information for debugging or documentation.
+        logger (logging.Logger or None): Logger instance for logging messages.
+
+    Methods:
+        add_route(path, handler, methods=["GET"], middlewares=None):
+            Adds a route to the router with optional middlewares.
+
+        group(base_path, middlewares=None) -> "Router":
+            Creates a sub-router with a base path and optional group-specific middlewares.
+
+        route(path, methods=["GET"], middlewares=[]):
+            A decorator to define a route with optional middlewares.
+
+        get_handler(method, path):
+            Retrieve the handler for a given HTTP method and path.
+
+        add_global_middleware(middleware) -> None:
+            Adds a middleware that will be applied globally to all routes.
+
+        log(level: str, message: str) -> None:
+            Logs a message with the specified log level.
+    """
+
     def __init__(self):
         self.root = TrieNode()
         self.allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH"]
@@ -11,6 +47,24 @@ class Router:
         self.logger = None
 
     def add_route(self, path, handler, methods=["GET"], middlewares=None):
+        """
+        Adds a route to the router.
+
+        Args:
+            path (str): The URL path for the route. Dynamic segments should start with ':'.
+            handler (callable): The function or coroutine that handles requests to this route.
+            methods (list, optional): A list of HTTP methods this route should respond to. Defaults to ["GET"].
+            middlewares (list, optional): A list of middleware functions to apply to this route. Defaults to None.
+
+        Raises:
+            TypeError: If the handler is not callable.
+
+        Example:
+            def my_handler(request):
+                return "Hello, world!"
+
+            router.add_route("/hello", my_handler, methods=["GET"])
+        """
         segments = self._split_path(path)
         current_node = self.root
         for segment in segments:
@@ -37,20 +91,24 @@ class Router:
                 "doc": handler.__doc__,
             }
 
-            self.route_info.append({
-                'path': path,
-                'method': method,
-                'handler': handler,
-                'middlewares': middlewares,
-                'doc': handler.__doc__,
-            })
+            self.route_info.append(
+                {
+                    "path": path,
+                    "method": method,
+                    "handler": handler,
+                    "middlewares": middlewares,
+                    "doc": handler.__doc__,
+                }
+            )
 
-    def group(self, base_path, middlewares=None):
+    def group(self, base_path, middlewares=None) -> "Router":
         """
         Creates a sub-router (group) with a base path and optional group-specific middlewares.
+
         Args:
             base_path (str): The base path for the sub-router.
             middlewares (list, optional): List of middleware functions applied to all routes within this group.
+
         Returns:
             Router: A sub-router instance with the specified base path.
         """
@@ -92,6 +150,23 @@ class Router:
         return decorator
 
     def get_handler(self, method, path):
+        """
+        Retrieve the handler for a given HTTP method and path.
+
+        This method traverses the routing tree to find the appropriate handler
+        for the specified HTTP method and path. It supports both static and
+        dynamic path segments.
+
+        Args:
+            method (str): The HTTP method (e.g., 'GET', 'POST').
+            path (str): The URL path to match against the routing tree.
+
+        Returns:
+            tuple: A tuple containing:
+            - handler (callable or None): The matched handler function, or None if no match is found.
+            - path_params (dict): A dictionary of dynamic path parameters and their values.
+            - is_async (bool or None): A flag indicating if the handler is asynchronous, or None if no match is found.
+        """
         segments = self._split_path(path)
         current_node = self.root
         path_params = {}
@@ -125,16 +200,22 @@ class Router:
 
     def _apply_middlewares(self, handler_info, method, path) -> callable:
         """
-        Applies the middleware chain to the handler for the given method and path.
-        All middlewares are assumed to be synchronous.
+        Applies global and route-specific middlewares to the given handler.
+
+        This method takes a handler and wraps it with the middlewares specified
+        both globally and for the specific route. If the handler is asynchronous,
+        it ensures that the returned handler is also asynchronous.
 
         Args:
-            handler_info (dict): The route handler information containing the handler function and middlewares.
-            method (str): HTTP method.
-            path (str): Request path.
+            handler_info (dict): A dictionary containing handler information.
+                - "handler" (callable): The original handler function.
+                - "is_async" (bool): A flag indicating if the handler is asynchronous.
+                - "middlewares" (list, optional): A list of middlewares specific to the route.
+            method (str): The HTTP method for the route.
+            path (str): The path for the route.
 
         Returns:
-            callable: The final handler with middleware applied.
+            callable: The handler wrapped with the applied middlewares.
         """
         handler = handler_info["handler"]
         is_async = handler_info["is_async"]
@@ -171,6 +252,16 @@ Router Utility Classes
 
 
 class TrieNode:
+    """
+    A node in the Trie structure used for routing.
+
+    Attributes:
+        children (dict): A dictionary mapping child node keys to TrieNode objects.
+        handler (dict): A dictionary to store handlers associated with this node.
+        dynamic_child (TrieNode or None): A reference to a dynamic child node, if any.
+        param_name (str or None): The name of the parameter if this node represents a dynamic segment.
+    """
+
     def __init__(self):
         self.children = {}
         self.handler = {}
