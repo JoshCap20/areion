@@ -69,7 +69,7 @@ class HttpServer:
         while True:
             try:
                 data = await asyncio.wait_for(
-                    reader.readuntil(b'\r\n\r\n'), timeout=self.keep_alive_timeout
+                    reader.readuntil(b"\r\n\r\n"), timeout=self.keep_alive_timeout
                 )
             except asyncio.TimeoutError:
                 break
@@ -84,16 +84,16 @@ class HttpServer:
                 break
 
             try:
-                headers_end = data.find(b'\r\n\r\n')
-                header_data = data[:headers_end].decode('utf-8')
-                lines = header_data.split('\r\n')
+                headers_end = data.find(b"\r\n\r\n")
+                header_data = data[:headers_end].decode("utf-8")
+                lines = header_data.split("\r\n")
                 request_line = lines[0]
                 header_lines = lines[1:]
 
                 method, path, _ = request_line.strip().split(" ")
                 headers = {}
                 for line in header_lines:
-                    if ': ' in line:
+                    if ": " in line:
                         header_name, header_value = line.strip().split(": ", 1)
                         headers[header_name] = header_value
 
