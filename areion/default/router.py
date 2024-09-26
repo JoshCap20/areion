@@ -46,6 +46,7 @@ class Router:
         self.global_middlewares = []
         self.route_info = []
         self.logger = None
+        self.strict_http: bool = False
 
     def add_route(
         self,
@@ -72,10 +73,18 @@ class Router:
 
             router.add_route("/hello", my_handler, methods=["GET"])
         """
-        # Remove this validation to add support for non-HTTP standard methods
         # Does not hurt perfomance since performed at startup
-        if not all(method in self.allowed_methods for method in methods):
+        if self.strict_http and not all(
+            method in self.allowed_methods for method in methods
+        ):
             raise ValueError("Invalid HTTP method specified.")
+        # TODO: Investigate impact on route path
+        if self.strict_http and not path.startswith("/"):
+            raise ValueError("Path must start with a forward slash.")
+        if self._check_if_route_and_methods_exists(path, methods):
+            raise ValueError("A route already exists with one of these methods.")
+        if not callable(handler):
+            raise TypeError("Handler must be a callable function.")
 
         segments: list = self._split_path(path)
         current_node: TrieNode = self.root
@@ -209,7 +218,7 @@ class Router:
     def add_global_middleware(self, middleware: callable) -> None:
         """
         Adds a middleware that will be applied globally to all routes.
-        
+
         Parameters:
             middleware (callable): A callable that represents the middleware to be added.
         """
@@ -222,6 +231,29 @@ class Router:
         Splits a path into segments and normalizes it.
         """
         return [segment for segment in path.strip("/").split("/") if segment]
+
+    def _check_if_route_and_methods_exists(self, path: str, methods: list[str]) -> bool:
+        """
+        Checks if a route exists in the router.
+        """
+
+        def _check_if_method_exists(path: str, method: str) -> bool:
+            """
+            Checks if a method exists for a given path.
+            """
+            segments = self._split_path(path)
+            current_node = self.root
+            for segment in segments:
+                if segment in current_node.children:
+                    current_node = current_node.children[segment]
+                elif current_node.dynamic_child:
+                    current_node = current_node.dynamic_child
+                else:
+                    return False
+            return method in current_node.handler
+
+        for method in methods:
+            return _check_if_method_exists(path, method)
 
     def log(self, level: str, message: str) -> None:
         """
