@@ -1,5 +1,5 @@
 from asyncio import iscoroutinefunction
-from ..core.exceptions import MethodNotAllowedException, NotFoundError
+from ..core.exceptions import MethodNotAllowedError, NotFoundError
 
 
 class Router:
@@ -204,7 +204,7 @@ class Router:
             is_async = handler_info["is_async"]
             return handler_info["handler"], path_params, is_async
 
-        raise MethodNotAllowedException()
+        raise MethodNotAllowedError()
 
     def add_global_middleware(self, middleware: callable) -> None:
         """
