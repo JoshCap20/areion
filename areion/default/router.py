@@ -197,7 +197,7 @@ class Router:
         current_node = self.root
         path_params = {}
 
-        # TODO: [DESIGN] PASS MOROE INFO TO THESE EXCEPTIONS TO GLOBALLY LOG
+        # TODO: [DESIGN] PASS MORE INFO TO THESE EXCEPTIONS TO GLOBALLY LOG
         for segment in segments:
             if segment in current_node.children:
                 current_node = current_node.children[segment]
@@ -208,12 +208,15 @@ class Router:
             else:
                 raise NotFoundError()
 
+        if not current_node.handler:
+            raise NotFoundError()
+
         if method in current_node.handler:
             handler_info = current_node.handler[method]
             is_async = handler_info["is_async"]
             return handler_info["handler"], path_params, is_async
-
-        raise MethodNotAllowedError()
+        else:
+            raise MethodNotAllowedError()
 
     def add_global_middleware(self, middleware: callable) -> None:
         """

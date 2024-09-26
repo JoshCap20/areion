@@ -1,7 +1,7 @@
 import unittest
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
-from ... import DefaultRouter as Router
+from ... import DefaultRouter as Router, NotFoundError, MethodNotAllowedError
 
 
 class TestRouter(unittest.TestCase):
@@ -30,19 +30,15 @@ class TestRouter(unittest.TestCase):
         # Test invalid route
         handler = MagicMock()
         self.router.add_route("/valid", handler)
-        route_handler, path_params, is_async = self.router.get_handler("GET", "/invalid")
-        self.assertIsNone(route_handler)
-        self.assertIsNone(path_params)
-        self.assertIsNone(is_async)
+        with self.assertRaises(NotFoundError):
+            self.router.get_handler("GET", "/invalid")
 
     def test_get_handler_invalid_method(self):
         # Test invalid method for a valid route
         handler = MagicMock()
         self.router.add_route("/test", handler, methods=["POST"])
-        route_handler, path_params, is_async = self.router.get_handler("GET", "/test")
-        self.assertIsNone(route_handler)
-        self.assertIsNone(path_params)
-        self.assertIsNone(is_async)
+        with self.assertRaises(MethodNotAllowedError):
+            self.router.get_handler("GET", "/test")
 
     def test_add_global_middleware(self):
         # Test global middleware application
@@ -151,10 +147,8 @@ class TestRouter(unittest.TestCase):
         # Test dynamic route with missing parameter
         handler = MagicMock()
         self.router.add_route("/user/:id", handler)
-        route_handler, path_params, is_async = self.router.get_handler("GET", "/user/")
-        self.assertIsNone(route_handler)
-        self.assertIsNone(path_params)
-        self.assertIsNone(is_async)
+        with self.assertRaises(NotFoundError):
+            self.router.get_handler("GET", "/user/")
 
     def test_no_middlewares(self):
         # Test route without middleware
