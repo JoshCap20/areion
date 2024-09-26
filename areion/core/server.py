@@ -1,7 +1,7 @@
 import asyncio
 
 from .exceptions import HttpError, NotFoundError
-from .response import HttpResponse
+from .response import HttpResponse, HTTP_STATUS_CODES
 from .request import HttpRequest
 
 
@@ -57,6 +57,10 @@ class HttpServer:
     async def _process_request(self, reader, writer):
         try:
             await self._handle_request_logic(reader, writer)
+        except asyncio.CancelledError:
+            self.log("debug", "Client connection cancelled.")
+        except ConnectionResetError:
+            self.log("debug", "Connection reset by peer.")
         except Exception as e:
             if isinstance(e, ConnectionResetError):
                 self.log("debug", f"Connection reset by peer: {e}")
@@ -66,18 +70,29 @@ class HttpServer:
                 await self._send_response(writer, response)
 
     async def _handle_request_logic(self, reader, writer):
+        # HttpErrors are NOT handled outside of this method
         while True:
+            # Handle request reading
             try:
                 data = await asyncio.wait_for(
                     reader.readuntil(b"\r\n\r\n"), timeout=self.keep_alive_timeout
                 )
             except asyncio.TimeoutError:
+                response = HttpResponse(status_code=408, body=HTTP_STATUS_CODES[408])
+                await self._send_response(writer, response)
                 break
             except asyncio.IncompleteReadError:
+                response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400])
+                await self._send_response(writer, response)
                 break
             except asyncio.LimitOverrunError:
-                response = HttpResponse(status_code=413, body="Payload Too Large")
+                response = HttpResponse(status_code=413, body=HTTP_STATUS_CODES[413])
                 await self._send_response(writer, response)
+                break
+            except Exception as e:
+                response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500])
+                await self._send_response(writer, response)
+                self.log("error", f"Error reading request: {e}")
                 break
 
             if not data:
@@ -97,7 +112,9 @@ class HttpServer:
                         header_name, header_value = line.strip().split(": ", 1)
                         headers[header_name] = header_value
 
-                request = self.request_factory.create(method, path, headers)
+                request: HttpRequest = self.request_factory.create(
+                    method, path, headers
+                )
 
                 handler, path_params, is_async = self.router.get_handler(method, path)
 
@@ -113,10 +130,10 @@ class HttpServer:
                 response = HttpResponse(status_code=e.status_code, body=str(e))
             except Exception as e:
                 # Handles all other exceptions
-                response = HttpResponse(status_code=500, body="Internal Server Error")
+                response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500])
                 self.log("error", f"Exception in request handling: {e}")
 
-            await self._send_response(writer, response)
+            await self._send_response(writer=writer, response=response)
 
             if (
                 "Connection" in request.headers
