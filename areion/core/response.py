@@ -1,5 +1,6 @@
 import orjson
 
+
 HTTP_STATUS_CODES: dict[int, str] = {
     100: "Continue",
     101: "Switching Protocols",

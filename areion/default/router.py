@@ -1,4 +1,5 @@
 from asyncio import iscoroutinefunction
+from ..core.exceptions import MethodNotAllowedError, NotFoundError
 
 
 class Router:
@@ -45,8 +46,15 @@ class Router:
         self.global_middlewares = []
         self.route_info = []
         self.logger = None
+        self.strict_http: bool = False
 
-    def add_route(self, path, handler, methods=["GET"], middlewares=None):
+    def add_route(
+        self,
+        path: str,
+        handler: callable,
+        methods: list[str] = ["GET"],
+        middlewares: list[callable] = None,
+    ) -> None:
         """
         Adds a route to the router.
 
@@ -65,24 +73,37 @@ class Router:
 
             router.add_route("/hello", my_handler, methods=["GET"])
         """
-        segments = self._split_path(path)
-        current_node = self.root
+        # Does not hurt perfomance since performed at startup
+        if self.strict_http and not all(
+            method in self.allowed_methods for method in methods
+        ):
+            raise ValueError("Invalid HTTP method specified.")
+        # TODO: Investigate impact on route path
+        if self.strict_http and not path.startswith("/"):
+            raise ValueError("Path must start with a forward slash.")
+        if self._check_if_route_and_methods_exists(path, methods):
+            raise ValueError("A route already exists with one of these methods.")
+        if not callable(handler):
+            raise TypeError("Handler must be a callable function.")
+
+        segments: list = self._split_path(path)
+        current_node: TrieNode = self.root
         for segment in segments:
-            if segment.startswith(":"):  # Dynamic path segment
+            if segment.startswith(":"):
                 if current_node.dynamic_child is None:
                     current_node.dynamic_child = TrieNode()
                     current_node.dynamic_child.param_name = segment[1:]
                 current_node = current_node.dynamic_child
-            else:  # Static path segment
+            else:
                 if segment not in current_node.children:
                     current_node.children[segment] = TrieNode()
                 current_node = current_node.children[segment]
 
         for method in methods:
-            combined_middlewares = self.global_middlewares + (middlewares or [])
-            wrapped_handler = handler
+            combined_middlewares: list = self.global_middlewares + (middlewares or [])
+            wrapped_handler: callable = handler
             for middleware in reversed(combined_middlewares):
-                wrapped_handler = middleware(wrapped_handler)
+                wrapped_handler: callable = middleware(wrapped_handler)
 
             current_node.handler[method] = {
                 "handler": wrapped_handler,
@@ -91,6 +112,7 @@ class Router:
                 "doc": handler.__doc__,
             }
 
+            # For generating openapi documentation
             self.route_info.append(
                 {
                     "path": path,
@@ -101,7 +123,7 @@ class Router:
                 }
             )
 
-    def group(self, base_path, middlewares=None) -> "Router":
+    def group(self, base_path: str, middlewares: list[callable] = None) -> "Router":
         """
         Creates a sub-router (group) with a base path and optional group-specific middlewares.
 
@@ -113,7 +135,7 @@ class Router:
             Router: A sub-router instance with the specified base path.
         """
         sub_router = Router()
-        group_middlewares = middlewares or []
+        group_middlewares: list = middlewares or []
 
         def add_sub_route(sub_path, handler, methods=["GET"], middlewares=None):
             full_path = f"{base_path.rstrip('/')}/{sub_path.lstrip('/')}"
@@ -125,7 +147,9 @@ class Router:
         sub_router.add_route = add_sub_route
         return sub_router
 
-    def route(self, path, methods=["GET"], middlewares=[]):
+    def route(
+        self, path: str, methods: list[str] = ["GET"], middlewares: list[callable] = []
+    ):
         """
         A decorator to define a route with optional middlewares.
 
@@ -144,12 +168,14 @@ class Router:
         """
 
         def decorator(func):
-            self.add_route(path, func, methods=methods, middlewares=middlewares)
+            self.add_route(
+                path=path, handler=func, methods=methods, middlewares=middlewares
+            )
             return func
 
         return decorator
 
-    def get_handler(self, method, path):
+    def get_handler(self, method: str, path: str) -> tuple:
         """
         Retrieve the handler for a given HTTP method and path.
 
@@ -171,73 +197,72 @@ class Router:
         current_node = self.root
         path_params = {}
 
+        # TODO: [DESIGN] PASS MORE INFO TO THESE EXCEPTIONS TO GLOBALLY LOG
         for segment in segments:
             if segment in current_node.children:
                 current_node = current_node.children[segment]
-            elif current_node.dynamic_child:  # Match dynamic segments
+            elif current_node.dynamic_child:
                 param_node = current_node.dynamic_child
-                path_params[param_node.param_name] = segment  # Store dynamic param
+                path_params[param_node.param_name] = segment
                 current_node = param_node
             else:
-                return None, None, None
+                raise NotFoundError()
+
+        if not current_node.handler:
+            raise NotFoundError()
 
         if method in current_node.handler:
             handler_info = current_node.handler[method]
             is_async = handler_info["is_async"]
             return handler_info["handler"], path_params, is_async
+        else:
+            raise MethodNotAllowedError()
 
-        return None, None, None
+    def add_global_middleware(self, middleware: callable) -> None:
+        """
+        Adds a middleware that will be applied globally to all routes.
 
-    def _split_path(self, path):
-        """Splits a path into segments and normalizes it."""
-        return [segment for segment in path.strip("/").split("/") if segment]
-
-    ### Middleware Handling ###
-
-    def add_global_middleware(self, middleware) -> None:
-        """Adds a middleware that will be applied globally to all routes."""
+        Parameters:
+            middleware (callable): A callable that represents the middleware to be added.
+        """
         self.global_middlewares.append(middleware)
 
-    def _apply_middlewares(self, handler_info, method, path) -> callable:
+    ### Utility Methods ###
+
+    def _split_path(self, path: str) -> list:
         """
-        Applies global and route-specific middlewares to the given handler.
-
-        This method takes a handler and wraps it with the middlewares specified
-        both globally and for the specific route. If the handler is asynchronous,
-        it ensures that the returned handler is also asynchronous.
-
-        Args:
-            handler_info (dict): A dictionary containing handler information.
-                - "handler" (callable): The original handler function.
-                - "is_async" (bool): A flag indicating if the handler is asynchronous.
-                - "middlewares" (list, optional): A list of middlewares specific to the route.
-            method (str): The HTTP method for the route.
-            path (str): The path for the route.
-
-        Returns:
-            callable: The handler wrapped with the applied middlewares.
+        Splits a path into segments and normalizes it.
         """
-        handler = handler_info["handler"]
-        is_async = handler_info["is_async"]
+        return [segment for segment in path.strip("/").split("/") if segment]
 
-        middlewares = self.global_middlewares[:]
-        route_middlewares = handler_info.get("middlewares", [])
-        middlewares.extend(route_middlewares)
+    def _check_if_route_and_methods_exists(self, path: str, methods: list[str]) -> bool:
+        """
+        Checks if a route exists in the router.
+        """
 
-        for middleware in reversed(middlewares):
-            handler = middleware(handler)
+        def _check_if_method_exists(path: str, method: str) -> bool:
+            """
+            Checks if a method exists for a given path.
+            """
+            segments = self._split_path(path)
+            current_node = self.root
+            for segment in segments:
+                if segment in current_node.children:
+                    current_node = current_node.children[segment]
+                elif current_node.dynamic_child:
+                    current_node = current_node.dynamic_child
+                else:
+                    return False
+            return method in current_node.handler
 
-        if is_async:
-
-            async def async_wrapper(*args, **kwargs):
-                return await handler(*args, **kwargs)
-
-            return async_wrapper
-
-        return handler
+        for method in methods:
+            return _check_if_method_exists(path, method)
 
     def log(self, level: str, message: str) -> None:
-        # Safe logging method (bug fix for scheduled tasks before server is ran)
+        """
+        Safe logging method.
+        (Bug fix for scheduled tasks before server is ran)
+        """
         if self.logger:
             log_method = getattr(self.logger, level, None)
             if log_method:
