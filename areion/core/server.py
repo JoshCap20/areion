@@ -123,10 +123,11 @@ class HttpServer:
             except HttpError as e:
                 # Handles web exceptions raised by the handler
                 response = HttpResponse(status_code=e.status_code, body=str(e))
+                self.log("warning", f"[RESPONSE][HTTP-ERROR] {e}")
             except Exception as e:
                 # Handles all other exceptions
                 response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500])
-                self.log("error", f"Exception in request handling: {e}")
+                self.log("error", f"[RESPONSE][ERROR] {e}")
 
             await self._send_response(writer=writer, response=response)
 
