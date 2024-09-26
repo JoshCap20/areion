@@ -62,12 +62,7 @@ class HttpServer:
         except ConnectionResetError:
             self.log("debug", "Connection reset by peer.")
         except Exception as e:
-            if isinstance(e, ConnectionResetError):
-                self.log("debug", f"Connection reset by peer: {e}")
-            else:
-                self.log("error", f"Error processing request: {e}")
-                response = HttpResponse(status_code=500, body="Internal Server Error")
-                await self._send_response(writer, response)
+            self.log("warning", f"Error processing request: {e}")
 
     async def _handle_request_logic(self, reader, writer):
         # HttpErrors are NOT handled outside of this method
