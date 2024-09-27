@@ -3,7 +3,14 @@ from .response import HttpResponse
 
 class HttpRequest:
     def __init__(
-        self, method, path, headers, body=None, logger=None, engine=None, orchestrator=None
+        self,
+        method,
+        path,
+        headers,
+        body=None,
+        logger=None,
+        engine=None,
+        orchestrator=None,
     ):
         """
         Don't call this directly. Use HttpRequestFactory instead.
@@ -35,7 +42,7 @@ class HttpRequest:
             str or None: The value of the specified header if it exists, otherwise None.
         """
         return self.headers.get(key)
-    
+
     def get_body(self) -> str | None:
         """
         Retrieve the body of the request.
