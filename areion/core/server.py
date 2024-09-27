@@ -94,10 +94,14 @@ class HttpServer:
                 self.log("error", f"Error parsing headers: {e}")
                 break
             
+            # TODO: Break this into specific HTTP version handling
+            # TODO: Ensure proper host header
+            
+
             # TODO: Handle Transfer-Encoding
-            transfer_encoding = headers.get('Transfer-Encoding', '').lower()
-            if 'chunked' in transfer_encoding:
-                response = HttpResponse(status_code=501, body='Not Implemented')
+            transfer_encoding = headers.get("Transfer-Encoding", "").lower()
+            if "chunked" in transfer_encoding:
+                response = HttpResponse(status_code=501, body="Not Implemented")
                 await self._send_response(writer, response)
                 break
 
@@ -129,20 +133,21 @@ class HttpServer:
                 )
                 # self.log("info", f"[REQUEST] {request}")
                 try:
-                    handler, path_params, is_async = self.router.get_handler(method, path)
+                    handler, path_params, is_async = self.router.get_handler(
+                        method, path
+                    )
                 except MethodNotAllowedError:
-                    if hasattr(self.router, 'get_allowed_methods'):
+                    if hasattr(self.router, "get_allowed_methods"):
                         allowed_methods = self.router.get_allowed_methods(path)
                     else:
                         allowed_methods = []
                     response = HttpResponse(
                         status_code=405,
                         body=HTTP_STATUS_CODES[405],
-                        headers={"Allow": ", ".join(allowed_methods)}
+                        headers={"Allow": ", ".join(allowed_methods)},
                     )
                     await self._send_response(writer, response)
                     break
-
 
                 if is_async:
                     response = await handler(request, **path_params)
@@ -186,9 +191,6 @@ class HttpServer:
             response = HttpResponse(body=response)
 
         # TODO: Add interceptor component here
-        
-        # Looks cooler with version in response but security risk
-        response.set_header("Server", "Areion")
 
         buffer = response.format_response()
         writer.write(buffer)
