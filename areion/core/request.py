@@ -201,7 +201,7 @@ class HttpRequest:
         return f"<HttpRequest method={self.method} path={self.path} query_params={self.query_params} headers={self.headers} metadata={self.metadata}>"
 
     def __str__(self) -> str:
-        return f"HttpRequest: {self.method} {self.path}"
+        return f"[{self.method}] {self.path}"
 
 
 class HttpRequestFactory:

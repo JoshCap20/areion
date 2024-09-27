@@ -10,6 +10,8 @@ class TestHttpRequest(unittest.TestCase):
         self.path = "/test"
         self.headers = {"Content-Type": "application/json"}
         self.body = "Request Body"
+        self.query_params = {}
+        self.metadata = {}
         self.request = HttpRequest(self.method, self.path, self.headers, self.body)
 
     def test_initialization(self):
@@ -34,20 +36,56 @@ class TestHttpRequest(unittest.TestCase):
         self.assertIsNone(self.request.get_metadata("non_existent_key"))
         self.request.add_metadata("session_id", "abc123")
         self.assertEqual(self.request.get_metadata("session_id"), "abc123")
-        
+
+    def test_get_query_params(self):
+        self.assertEqual(self.request.query_params, {})
+        request = HttpRequest("GET", "/test?param1=value1&param2=value2", {})
+        self.assertEqual(
+            request.query_params, {"param1": ["value1"], "param2": ["value2"]}
+        )
+
+    def test_get_query_params_no_query(self):
+        self.assertEqual(self.request.query_params, {})
+        request = HttpRequest("GET", "/test", {})
+        self.assertEqual(request.query_params, {})
+
+    def test_get_query_params_multiple_values(self):
+        self.assertEqual(self.request.query_params, {})
+        request = HttpRequest("GET", "/test?param1=value1&param1=value2", {})
+        self.assertEqual(request.query_params, {"param1": ["value1", "value2"]})
+
     def test_get_body(self):
         self.request.body = "New Body"
         self.assertEqual(self.request.get_body(), "New Body")
 
+    def test_get_body_none(self):
+        self.request.body = None
+        self.assertIsNone(self.request.get_body())
+
+    def test_get_body_empty(self):
+        self.request.body = ""
+        self.assertEqual(self.request.get_body(), "")
+
+    def test_get_body_bytes(self):
+        self.request.body = b"Binary Body"
+        self.assertEqual(self.request.get_body(), b"Binary Body")
+
     def test_repr(self):
-        expected_repr = f"<HttpRequest method={self.method} path={self.path} headers={self.headers} body={self.body} metadata={{}}>"
+        expected_repr = f"<HttpRequest method={self.method} path={self.path} query_params={self.query_params} headers={self.headers} metadata={self.metadata}>"
         self.assertEqual(repr(self.request), expected_repr)
+
+    def test_str(self):
+        expected_str = f"[{self.method}] {self.path}"
+        self.assertEqual(str(self.request), expected_str)
 
     def test_as_dict_default(self):
         expected_dict = {
             "method": self.method,
             "path": self.path,
+            "query_params": {},
             "headers": self.headers,
+            "metadata": {},
+            "body": self.body,
         }
         self.assertEqual(self.request.as_dict(), expected_dict)
 
@@ -58,8 +96,10 @@ class TestHttpRequest(unittest.TestCase):
         expected_dict = {
             "method": self.method,
             "path": self.path,
+            "query_params": {},
             "headers": self.headers,
             "metadata": self.request.metadata,
+            "body": self.body,
             "logger": self.request.logger,
             "engine": self.request.engine,
             "orchestrator": self.request.orchestrator,
@@ -70,7 +110,10 @@ class TestHttpRequest(unittest.TestCase):
         expected_dict = {
             "method": self.method,
             "path": self.path,
+            "query_params": {},
             "headers": self.headers,
+            "metadata": {},
+            "body": self.body,
         }
         self.assertEqual(self.request.as_dict(show_components=False), expected_dict)
 
