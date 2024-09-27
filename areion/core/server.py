@@ -31,6 +31,7 @@ class HttpServer:
             raise ValueError("Buffer size must be a positive integer.")
         if not isinstance(keep_alive_timeout, int) or keep_alive_timeout <= 0:
             raise ValueError("Keep alive timeout must be a positive integer.")
+        
         self.semaphore = asyncio.Semaphore(max_conns)
         self.router = router
         self.request_factory = request_factory
@@ -45,10 +46,7 @@ class HttpServer:
         try:
             await self._process_request(reader, writer)
         except Exception as e:
-            if isinstance(e, ConnectionResetError):
-                self.log("debug", f"Connection reset by peer: {e}")
-            else:
-                self.log("error", f"Error processing request: {e}")
+            self.log("error", f"{e}")
         finally:
             if not writer.is_closing():
                 writer.close()
@@ -61,15 +59,13 @@ class HttpServer:
             self.log("debug", "Client connection cancelled.")
         except ConnectionResetError:
             self.log("debug", "Connection reset by peer.")
-        except Exception as e:
-            self.log("warning", f"Error processing request: {e}")
 
     async def _handle_request_logic(self, reader, writer):
         # HttpErrors are NOT handled outside of this method
         while True:
             # Handle request reading
             try:
-                data = await asyncio.wait_for(
+                headers_data = await asyncio.wait_for(
                     reader.readuntil(b"\r\n\r\n"), timeout=self.keep_alive_timeout
                 )
             except asyncio.TimeoutError:
@@ -90,25 +86,40 @@ class HttpServer:
                 self.log("error", f"Error reading request: {e}")
                 break
 
-            if not data:
+            if not headers_data:
                 break
+            
+            try:
+                request_line, headers = self._parse_headers(headers_data)
+            except Exception as e:
+                response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400])
+                await self._send_response(writer, response)
+                self.log("error", f"Error parsing headers: {e}")
+                break
+            
+            # TODO: Handle http_versions and keep alive better
+            method, path, http_version = request_line
+            
+            content_length = int(headers.get("Content-Length", 0))
+            body = b""
+            if content_length > 0:
+                try:
+                    body = await asyncio.wait_for(
+                        reader.readexactly(content_length), timeout=self.keep_alive_timeout
+                    )
+                except asyncio.TimeoutError:
+                    response = HttpResponse(status_code=408, body=HTTP_STATUS_CODES[408])
+                    await self._send_response(writer, response)
+                    break
+                except Exception as e:
+                    response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400])
+                    await self._send_response(writer, response)
+                    self.log("error", f"Error reading body: {e}")
+                    break
 
             try:
-                headers_end = data.find(b"\r\n\r\n")
-                header_data = data[:headers_end].decode("utf-8")
-                lines = header_data.split("\r\n")
-                request_line = lines[0]
-                header_lines = lines[1:]
-
-                method, path, _ = request_line.strip().split(" ")
-                headers = {}
-                for line in header_lines:
-                    if ": " in line:
-                        header_name, header_value = line.strip().split(": ", 1)
-                        headers[header_name] = header_value
-
                 request: HttpRequest = self.request_factory.create(
-                    method, path, headers
+                    method, path, headers, body
                 )
 
                 handler, path_params, is_async = self.router.get_handler(method, path)
@@ -137,15 +148,22 @@ class HttpServer:
             ):
                 break
 
-    async def _parse_headers(self, reader):
-        headers = {}
-        while True:
-            line = await reader.readline()
-            if line == b"\r\n":
-                break
-            header_name, header_value = line.decode("utf-8").strip().split(": ", 1)
-            headers[header_name] = header_value
-        return headers
+    def _parse_headers(self, headers_data):
+        try:
+            headers_text = headers_data.decode('iso-8859-1')
+            header_lines = headers_text.split('\r\n')
+            request_line = header_lines[0]
+            method, path, http_version = request_line.strip().split(' ', 2)
+            headers = {}
+            for line in header_lines[1:]:
+                if line == '':
+                    continue
+                key, value = line.split(':', 1)
+                headers[key.strip()] = value.strip()
+            return (method, path, http_version), headers
+        except Exception as e:
+            raise ValueError(f"Invalid headers: {e}")
+
 
     async def _send_response(self, writer, response):
         if not isinstance(response, HttpResponse):

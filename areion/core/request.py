@@ -3,7 +3,7 @@ from .response import HttpResponse
 
 class HttpRequest:
     def __init__(
-        self, method, path, headers, logger=None, engine=None, orchestrator=None
+        self, method, path, headers, body=None, logger=None, engine=None, orchestrator=None
     ):
         """
         Don't call this directly. Use HttpRequestFactory instead.
@@ -14,6 +14,7 @@ class HttpRequest:
         self.logger = logger
         self.engine = engine
         self.orchestrator = orchestrator
+        self.body = body
         self.metadata = {}
 
     def add_header(self, key: str, value: any) -> None:
@@ -34,6 +35,14 @@ class HttpRequest:
             str or None: The value of the specified header if it exists, otherwise None.
         """
         return self.headers.get(key)
+    
+    def get_body(self) -> str | None:
+        """
+        Retrieve the body of the request.
+        Returns:
+            str or None: The body of the request if it exists, otherwise None.
+        """
+        return self.body
 
     def add_metadata(self, key: str, value: any) -> None:
         """
@@ -139,7 +148,7 @@ class HttpRequestFactory:
         self.engine = engine
         self.orchestrator = orchestrator
 
-    def create(self, method, path, headers):
+    def create(self, method, path, headers, body=None):
         """
         Creates an HttpRequest with injected logger, engine, and orchestrator.
         """
@@ -150,4 +159,5 @@ class HttpRequestFactory:
             logger=self.logger,
             engine=self.engine,
             orchestrator=self.orchestrator,
+            body=body,
         )
