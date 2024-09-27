@@ -165,6 +165,9 @@ class HttpResponse:
             bytes: The formatted HTTP response.
         """
         body = self._format_body()
+        self.headers["Server"] = (
+            "Areion"  # Looks cooler with version in response but security risk
+        )
         self._ensure_content_length(body)
         response_line = self._get_response_line()
         headers = self._format_headers()
