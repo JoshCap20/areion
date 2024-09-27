@@ -174,6 +174,27 @@ class HttpResponse:
             value (any): The value of the header.
         """
         self.headers[key] = value
+        
+    def set_headers(self, headers: dict) -> None:
+        """
+        Set multiple headers in the response.
+
+        Args:
+            headers (dict): A dictionary of headers to set.
+        """
+        self.headers.update(headers)
+        
+    def set_status_code(self, status_code: int) -> None:
+        """
+        Set the status code of the response.
+
+        Args:
+            status_code (int): The HTTP status code.
+        """
+        # TODO: Access http_strict flag and enforce here if needed
+        if status_code > 599 or status_code < 100:
+            raise ValueError(f"Invalid status code: {status_code}")
+        self.status_code = status_code
 
     def __str__(self):
         return f"{self.status_code} {self._get_status_phrase()}"
