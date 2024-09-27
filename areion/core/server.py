@@ -31,7 +31,7 @@ class HttpServer:
             raise ValueError("Buffer size must be a positive integer.")
         if not isinstance(keep_alive_timeout, int) or keep_alive_timeout <= 0:
             raise ValueError("Keep alive timeout must be a positive integer.")
-        
+
         self.semaphore = asyncio.Semaphore(max_conns)
         self.router = router
         self.request_factory = request_factory
@@ -80,15 +80,10 @@ class HttpServer:
                 response = HttpResponse(status_code=413, body=HTTP_STATUS_CODES[413])
                 await self._send_response(writer, response)
                 break
-            except Exception as e:
-                response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500])
-                await self._send_response(writer, response)
-                self.log("error", f"Error reading request: {e}")
-                break
 
             if not headers_data:
                 break
-            
+
             try:
                 request_line, headers = self._parse_headers(headers_data)
             except Exception as e:
@@ -96,23 +91,28 @@ class HttpServer:
                 await self._send_response(writer, response)
                 self.log("error", f"Error parsing headers: {e}")
                 break
-            
+
             # TODO: Handle http_versions and keep alive better
             method, path, http_version = request_line
-            
+
             content_length = int(headers.get("Content-Length", 0))
             body = b""
             if content_length > 0:
                 try:
                     body = await asyncio.wait_for(
-                        reader.readexactly(content_length), timeout=self.keep_alive_timeout
+                        reader.readexactly(content_length),
+                        timeout=self.keep_alive_timeout,
                     )
                 except asyncio.TimeoutError:
-                    response = HttpResponse(status_code=408, body=HTTP_STATUS_CODES[408])
+                    response = HttpResponse(
+                        status_code=408, body=HTTP_STATUS_CODES[408]
+                    )
                     await self._send_response(writer, response)
                     break
                 except Exception as e:
-                    response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400])
+                    response = HttpResponse(
+                        status_code=400, body=HTTP_STATUS_CODES[400]
+                    )
                     await self._send_response(writer, response)
                     self.log("error", f"Error reading body: {e}")
                     break
@@ -121,6 +121,7 @@ class HttpServer:
                 request: HttpRequest = self.request_factory.create(
                     method, path, headers, body
                 )
+                # self.log("info", f"[REQUEST] {request}")
 
                 handler, path_params, is_async = self.router.get_handler(method, path)
 
@@ -150,20 +151,19 @@ class HttpServer:
 
     def _parse_headers(self, headers_data):
         try:
-            headers_text = headers_data.decode('iso-8859-1')
-            header_lines = headers_text.split('\r\n')
+            headers_text = headers_data.decode("iso-8859-1")
+            header_lines = headers_text.split("\r\n")
             request_line = header_lines[0]
-            method, path, http_version = request_line.strip().split(' ', 2)
+            method, path, http_version = request_line.strip().split(" ", 2)
             headers = {}
             for line in header_lines[1:]:
-                if line == '':
+                if line == "":
                     continue
-                key, value = line.split(':', 1)
+                key, value = line.split(":", 1)
                 headers[key.strip()] = value.strip()
             return (method, path, http_version), headers
         except Exception as e:
             raise ValueError(f"Invalid headers: {e}")
-
 
     async def _send_response(self, writer, response):
         if not isinstance(response, HttpResponse):

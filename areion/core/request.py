@@ -18,7 +18,7 @@ class HttpRequest:
         logger (object, optional): A logger instance for logging messages. Defaults to None.
         engine (object, optional): A template engine instance for rendering templates. Defaults to None.
         orchestrator (object, optional): An orchestrator instance for submitting tasks. Defaults to None.
-        metadata (dict): A dictionary for storing additional metadata.
+        metadata (dict): A dictionary for storing additional metadata. Always an empty dictionary on initialization.
     Methods:
         add_header(key: str, value: any) -> None:
             Adds a header to the request.
@@ -53,14 +53,14 @@ class HttpRequest:
         """
         Don't call this directly. Use HttpRequestFactory instead.
         """
-        self.method = method
-        self.path = path
-        self.headers = headers
+        self.method: str = method
+        self.path: str = path
+        self.headers: dict = headers
+        self.body: bytes = body
+        self.metadata: dict = {}
         self.logger = logger
         self.engine = engine
         self.orchestrator = orchestrator
-        self.body = body
-        self.metadata = {}
 
     def add_header(self, key: str, value: any) -> None:
         """
@@ -142,7 +142,7 @@ class HttpRequest:
         else:
             raise ValueError("No orchestrator available to submit the task.")
 
-    def log(self, message: str, level: str = "info"):
+    def log(self, message: str, level: str = "info") -> None:
         """
         Log a message using the injected logger.
         Parameters:
@@ -177,10 +177,10 @@ class HttpRequest:
         }
 
     def __repr__(self) -> str:
-        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
+        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} body={self.body} metadata={self.metadata}>"
 
     def __str__(self) -> str:
-        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
+        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} body={self.body} metadata={self.metadata}>"
 
 
 class HttpRequestFactory:
