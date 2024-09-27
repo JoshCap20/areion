@@ -139,15 +139,6 @@ class HttpResponse:
         """
         return f"HTTP/1.1 {self.status_code} {self._get_status_phrase()}\r\n"
 
-    def _ensure_content_length(self, body) -> None:
-        """
-        Ensure that the Content-Length header is set based on the body length.
-
-        Args:
-            body (bytes): The response body.
-        """
-        self.headers["Content-Length"] = str(len(body))
-
     def _format_headers(self) -> str:
         """
         Format the headers for the HTTP response.
@@ -168,7 +159,7 @@ class HttpResponse:
         self.headers["Server"] = (
             "Areion"  # Looks cooler with version in response but security risk
         )
-        self._ensure_content_length(body)
+        self.headers["Content-Length"] = str(len(body))
         response_line = self._get_response_line()
         headers = self._format_headers()
 
