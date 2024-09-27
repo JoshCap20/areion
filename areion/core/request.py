@@ -3,6 +3,7 @@ HttpRequest is the representation of the request passed to route handlers by the
 """
 
 from .response import HttpResponse
+from urllib.parse import urlparse, parse_qs
 
 
 class HttpRequest:
@@ -30,6 +31,8 @@ class HttpRequest:
             Adds a metadata entry to the request.
         get_metadata(key: str) -> any:
             Retrieve the value associated with a given key from the metadata.
+        get_query_param(key: str) -> any:
+            Retrieve the value associated with a given key from the query parameters
         render_template(template_name: str, context: dict = None) -> str:
             Renders a template using the injected template engine.
         submit_task(task: callable, *args):
@@ -54,13 +57,16 @@ class HttpRequest:
         Don't call this directly. Use HttpRequestFactory instead.
         """
         self.method: str = method
-        self.path: str = path
         self.headers: dict = headers
         self.body: bytes = body
         self.metadata: dict = {}
         self.logger = logger
         self.engine = engine
         self.orchestrator = orchestrator
+
+        parsed_url = urlparse(path)
+        self.path = parsed_url.path
+        self.query_params = parse_qs(parsed_url.query)
 
     def add_header(self, key: str, value: any) -> None:
         """
@@ -107,6 +113,16 @@ class HttpRequest:
             Any: The value associated with the specified key, or None if the key is not found.
         """
         return self.metadata.get(key)
+
+    def get_query_param(self, key) -> any:
+        """
+        Retrieve the value associated with a given key from the query parameters.
+        Args:
+            key (str): The key for which to retrieve the value from the query parameters.
+        Returns:
+            Any: The value associated with the specified key, or None if the key is not found.
+        """
+        return self.query_params.get(key)
 
     def render_template(self, template_name: str, context: dict = None) -> str:
         """
@@ -164,8 +180,10 @@ class HttpRequest:
             return {
                 "method": self.method,
                 "path": self.path,
+                "query_params": self.query_params,
                 "headers": self.headers,
                 "metadata": self.metadata,
+                "body": self.body,
                 "logger": self.logger,
                 "engine": self.engine,
                 "orchestrator": self.orchestrator,
@@ -173,14 +191,17 @@ class HttpRequest:
         return {
             "method": self.method,
             "path": self.path,
+            "query_params": self.query_params,
             "headers": self.headers,
+            "metadata": self.metadata,
+            "body": self.body,
         }
 
     def __repr__(self) -> str:
-        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} body={self.body} metadata={self.metadata}>"
+        return f"<HttpRequest method={self.method} path={self.path} query_params={self.query_params} headers={self.headers} metadata={self.metadata}>"
 
     def __str__(self) -> str:
-        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} body={self.body} metadata={self.metadata}>"
+        return f"HttpRequest: {self.method} {self.path}"
 
 
 class HttpRequestFactory:

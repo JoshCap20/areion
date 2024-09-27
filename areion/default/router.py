@@ -41,7 +41,7 @@ class Router:
 
     def __init__(self):
         self.root = TrieNode()
-        self.allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH"]
+        self.allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
         self.middlewares = {}
         self.global_middlewares = []
         self.route_info = []
@@ -193,6 +193,7 @@ class Router:
             - path_params (dict): A dictionary of dynamic path parameters and their values.
             - is_async (bool or None): A flag indicating if the handler is asynchronous, or None if no match is found.
         """
+        path = self._remove_query_params(path)
         segments = self._split_path(path)
         current_node = self.root
         path_params = {}
@@ -243,6 +244,12 @@ class Router:
         return list(current_node.handler.keys())
 
     ### Utility Methods ###
+    
+    def _remove_query_params(self, path: str) -> str:
+        """
+        Removes query parameters from the path.
+        """
+        return path.split('?', 1)[0]
 
     def _split_path(self, path: str) -> list:
         """
@@ -259,6 +266,8 @@ class Router:
             """
             Checks if a method exists for a given path.
             """
+            path = self._remove_query_params(path)
+            
             segments = self._split_path(path)
             current_node = self.root
             for segment in segments:
@@ -272,6 +281,7 @@ class Router:
 
         for method in methods:
             return _check_if_method_exists(path, method)
+        return False
 
     def log(self, level: str, message: str) -> None:
         """
