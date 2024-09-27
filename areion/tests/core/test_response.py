@@ -131,6 +131,11 @@ class TestHttpResponse(unittest.TestCase):
             HttpResponse()._infer_content_type(b"bytes"), "application/octet-stream"
         )
         self.assertEqual(HttpResponse()._infer_content_type(None), "text/plain")
+        
+    def test_set_header(self):
+        response = HttpResponse()
+        response.set_header("Content-Type", "text/plain")
+        self.assertEqual(response.headers["Content-Type"], "text/plain")
 
 
 if __name__ == "__main__":

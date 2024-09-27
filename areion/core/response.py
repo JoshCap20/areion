@@ -170,3 +170,19 @@ class HttpResponse:
         headers = self._format_headers()
 
         return (response_line + headers + "\r\n").encode("utf-8") + body
+
+    def set_header(self, key: str, value: any) -> None:
+        """
+        Set a header in the response.
+
+        Args:
+            key (str): The name of the header.
+            value (any): The value of the header.
+        """
+        self.headers[key] = value
+
+    def __str__(self):
+        return f"{self.status_code} {self._get_status_phrase()}"
+
+    def __repr__(self):
+        return f"<HttpResponse status_code={self.status_code} content_type={self.content_type} headers={self.headers}>"

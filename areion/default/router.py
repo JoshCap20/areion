@@ -226,6 +226,21 @@ class Router:
             middleware (callable): A callable that represents the middleware to be added.
         """
         self.global_middlewares.append(middleware)
+        
+    def get_allowed_methods(self, path: str) -> list[str]:
+        """
+        Returns a list of allowed methods for a given path.
+        """
+        segments = self._split_path(path)
+        current_node = self.root
+        for segment in segments:
+            if segment in current_node.children:
+                current_node = current_node.children[segment]
+            elif current_node.dynamic_child:
+                current_node = current_node.dynamic_child
+            else:
+                return []
+        return list(current_node.handler.keys())
 
     ### Utility Methods ###
 

@@ -169,6 +169,25 @@ class TestRouter(unittest.TestCase):
         route_handler, path_params, _ = self.router.get_handler("GET", "/test/route")
         self.assertEqual(route_handler, handler)
 
+    def test_get_allowed_methods(self):
+        # Test if get_allowed_methods returns correct methods
+        handler = MagicMock()
+        self.router.add_route("/test", handler, methods=["GET", "POST"])
+        allowed_methods = self.router.get_allowed_methods("/test")
+        self.assertEqual(allowed_methods, ["GET", "POST"])
+
+    def test_get_allowed_methods_no_methods(self):
+        # TODO: Change behavior to throw error in add_route when no methods are provided
+        handler = MagicMock()
+        self.router.add_route("/test", handler, methods=[])
+        allowed_methods = self.router.get_allowed_methods("/test")
+        self.assertEqual(allowed_methods, [])
+
+    def test_get_allowed_methods_no_route(self):
+        # Test if get_allowed_methods returns empty list for non-existent route
+        allowed_methods = self.router.get_allowed_methods("/test")
+        self.assertEqual(allowed_methods, [])
+
 
 if __name__ == "__main__":
     unittest.main()
