@@ -93,10 +93,9 @@ class HttpServer:
                 await self._send_response(writer, response)
                 self.log("error", f"Error parsing headers: {e}")
                 break
-            
+
             # TODO: Break this into specific HTTP version handling
             # TODO: Ensure proper host header
-            
 
             # TODO: Handle Transfer-Encoding
             transfer_encoding = headers.get("Transfer-Encoding", "").lower()
@@ -149,10 +148,23 @@ class HttpServer:
                     await self._send_response(writer, response)
                     break
 
-                if is_async:
+                # Handle OPTIONS and HEAD requests
+                if method == "OPTIONS":
+                    response = HttpResponse(status_code=204)
+                    response.set_header(
+                        "Allow", ", ".join(self.router.get_allowed_methods(path))
+                    )
+                elif method == "HEAD":
                     response = await handler(request, **path_params)
+                    response.body = b""
+                elif request.method == "CONNECT":
+                    response = HttpResponse(status_code=501, body="Not Implemented")
                 else:
-                    response = handler(request, **path_params)
+                    if is_async:
+                        response = await handler(request, **path_params)
+                    else:
+                        response = handler(request, **path_params)
+
             except HttpError as e:
                 # Handles web exceptions raised by route handler
                 response = HttpResponse(status_code=e.status_code, body=str(e))
