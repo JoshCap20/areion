@@ -11,7 +11,6 @@ class TestHttpResponse(unittest.TestCase):
         self.assertIn(b"HTTP/1.1 200 OK", formatted_response)
         self.assertIn(b"Content-Type: application/json", formatted_response)
         self.assertIn(b'{"key":"value"}', formatted_response)
-        
 
     def test_html_response(self):
         body = "<html><body>Hello, World!</body></html>"
@@ -131,6 +130,34 @@ class TestHttpResponse(unittest.TestCase):
             HttpResponse()._infer_content_type(b"bytes"), "application/octet-stream"
         )
         self.assertEqual(HttpResponse()._infer_content_type(None), "text/plain")
+
+    def test_set_header(self):
+        response = HttpResponse()
+        response.set_header("Content-Type", "text/plain")
+        self.assertEqual(response.headers["Content-Type"], "text/plain")
+
+    def test_set_headers(self):
+        response = HttpResponse()
+        response.set_headers(
+            {"Content-Type": "text/plain", "X-Custom-Header": "CustomValue"}
+        )
+        self.assertEqual(response.headers["Content-Type"], "text/plain")
+        self.assertEqual(response.headers["X-Custom-Header"], "CustomValue")
+
+    def test_set_headers_invalid(self):
+        response = HttpResponse()
+        with self.assertRaises(ValueError):
+            response.set_headers("invalid")
+
+    def test_set_status_code(self):
+        response = HttpResponse()
+        response.set_status_code(404)
+        self.assertEqual(response.status_code, 404)
+
+    def test_set_status_code_invalid(self):
+        response = HttpResponse()
+        with self.assertRaises(ValueError):
+            response.set_status_code(999)
 
 
 if __name__ == "__main__":

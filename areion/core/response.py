@@ -139,15 +139,6 @@ class HttpResponse:
         """
         return f"HTTP/1.1 {self.status_code} {self._get_status_phrase()}\r\n"
 
-    def _ensure_content_length(self, body) -> None:
-        """
-        Ensure that the Content-Length header is set based on the body length.
-
-        Args:
-            body (bytes): The response body.
-        """
-        self.headers["Content-Length"] = str(len(body))
-
     def _format_headers(self) -> str:
         """
         Format the headers for the HTTP response.
@@ -165,8 +156,48 @@ class HttpResponse:
             bytes: The formatted HTTP response.
         """
         body = self._format_body()
-        self._ensure_content_length(body)
+        self.headers["Server"] = (
+            "Areion"  # Looks cooler with version in response but security risk
+        )
+        self.headers["Content-Length"] = str(len(body))
         response_line = self._get_response_line()
         headers = self._format_headers()
 
         return (response_line + headers + "\r\n").encode("utf-8") + body
+
+    def set_header(self, key: str, value: any) -> None:
+        """
+        Set a header in the response.
+
+        Args:
+            key (str): The name of the header.
+            value (any): The value of the header.
+        """
+        self.headers[key] = value
+        
+    def set_headers(self, headers: dict) -> None:
+        """
+        Set multiple headers in the response.
+
+        Args:
+            headers (dict): A dictionary of headers to set.
+        """
+        self.headers.update(headers)
+        
+    def set_status_code(self, status_code: int) -> None:
+        """
+        Set the status code of the response.
+
+        Args:
+            status_code (int): The HTTP status code.
+        """
+        # TODO: Access http_strict flag and enforce here if needed
+        if status_code > 599 or status_code < 100:
+            raise ValueError(f"Invalid status code: {status_code}")
+        self.status_code = status_code
+
+    def __str__(self):
+        return f"{self.status_code} {self._get_status_phrase()}"
+
+    def __repr__(self):
+        return f"<HttpResponse status_code={self.status_code} content_type={self.content_type} headers={self.headers}>"

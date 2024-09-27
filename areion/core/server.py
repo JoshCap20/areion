@@ -1,6 +1,6 @@
 import asyncio
 
-from .exceptions import HttpError, NotFoundError
+from .exceptions import HttpError, MethodNotAllowedError
 from .response import HttpResponse, HTTP_STATUS_CODES
 from .request import HttpRequest
 
@@ -61,7 +61,7 @@ class HttpServer:
             self.log("debug", "Connection reset by peer.")
 
     async def _handle_request_logic(self, reader, writer):
-        # HttpErrors are NOT handled outside of this method
+        # HttpErrors are NOT handled correctly outside of this method
         while True:
             # Handle request reading
             try:
@@ -85,15 +85,24 @@ class HttpServer:
                 break
 
             try:
+                # TODO: Handle http_versions and keep alive better
                 request_line, headers = self._parse_headers(headers_data)
+                method, path, http_version = request_line
             except Exception as e:
                 response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400])
                 await self._send_response(writer, response)
                 self.log("error", f"Error parsing headers: {e}")
                 break
 
-            # TODO: Handle http_versions and keep alive better
-            method, path, http_version = request_line
+            # TODO: Break this into specific HTTP version handling
+            # TODO: Ensure proper host header
+
+            # TODO: Handle Transfer-Encoding
+            transfer_encoding = headers.get("Transfer-Encoding", "").lower()
+            if "chunked" in transfer_encoding:
+                response = HttpResponse(status_code=501, body="Not Implemented")
+                await self._send_response(writer, response)
+                break
 
             content_length = int(headers.get("Content-Length", 0))
             body = b""
@@ -122,18 +131,42 @@ class HttpServer:
                     method, path, headers, body
                 )
                 # self.log("info", f"[REQUEST] {request}")
+                try:
+                    handler, path_params, is_async = self.router.get_handler(
+                        method, path
+                    )
+                except MethodNotAllowedError:
+                    if hasattr(self.router, "get_allowed_methods"):
+                        allowed_methods = self.router.get_allowed_methods(path)
+                    else:
+                        allowed_methods = []
+                    response = HttpResponse(
+                        status_code=405,
+                        body=HTTP_STATUS_CODES[405],
+                        headers={"Allow": ", ".join(allowed_methods)},
+                    )
+                    await self._send_response(writer, response)
+                    break
 
-                handler, path_params, is_async = self.router.get_handler(method, path)
-
-                if not handler:
-                    raise NotFoundError()
-
-                if is_async:
+                # Handle OPTIONS and HEAD requests
+                if method == "OPTIONS":
+                    response = HttpResponse(status_code=204)
+                    response.set_header(
+                        "Allow", ", ".join(self.router.get_allowed_methods(path))
+                    )
+                elif method == "HEAD":
                     response = await handler(request, **path_params)
+                    response.body = b""
+                elif request.method == "CONNECT":
+                    response = HttpResponse(status_code=501, body="Not Implemented")
                 else:
-                    response = handler(request, **path_params)
+                    if is_async:
+                        response = await handler(request, **path_params)
+                    else:
+                        response = handler(request, **path_params)
+
             except HttpError as e:
-                # Handles web exceptions raised by the handler
+                # Handles web exceptions raised by route handler
                 response = HttpResponse(status_code=e.status_code, body=str(e))
                 self.log("warning", f"[RESPONSE][HTTP-ERROR] {e}")
             except Exception as e:

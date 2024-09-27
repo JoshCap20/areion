@@ -23,6 +23,8 @@ from .core import (
 
 from .base import BaseEngine, BaseLogger, BaseOrchestrator, BaseRouter, BaseMiddleware
 
+__version__ = "v1.1.6"
+
 __all__ = [
     # Main classes
     "AreionServer",
