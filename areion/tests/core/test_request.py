@@ -9,7 +9,8 @@ class TestHttpRequest(unittest.TestCase):
         self.method = "GET"
         self.path = "/test"
         self.headers = {"Content-Type": "application/json"}
-        self.request = HttpRequest(self.method, self.path, self.headers)
+        self.body = "Request Body"
+        self.request = HttpRequest(self.method, self.path, self.headers, self.body)
 
     def test_initialization(self):
         self.assertEqual(self.request.method, self.method)
@@ -33,9 +34,13 @@ class TestHttpRequest(unittest.TestCase):
         self.assertIsNone(self.request.get_metadata("non_existent_key"))
         self.request.add_metadata("session_id", "abc123")
         self.assertEqual(self.request.get_metadata("session_id"), "abc123")
+        
+    def test_get_body(self):
+        self.request.body = "New Body"
+        self.assertEqual(self.request.get_body(), "New Body")
 
     def test_repr(self):
-        expected_repr = f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={{}}>"
+        expected_repr = f"<HttpRequest method={self.method} path={self.path} headers={self.headers} body={self.body} metadata={{}}>"
         self.assertEqual(repr(self.request), expected_repr)
 
     def test_as_dict_default(self):
