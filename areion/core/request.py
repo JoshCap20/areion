@@ -1,7 +1,45 @@
+"""
+HttpRequest is the representation of the request passed to route handlers by the server.
+"""
+
 from .response import HttpResponse
 
 
 class HttpRequest:
+    """
+    HttpRequest class represents an HTTP request with various attributes and methods to manipulate and retrieve request data.
+    Request objects are passed as arguments to route handlers by the server. It includes access to certain HTTP request components,
+        such as headers, body, and metadata, as well as provide access to logging, template rendering, and task submission.
+    Attributes:
+        method (str): The HTTP method (e.g., GET, POST).
+        path (str): The path of the request.
+        headers (dict): A dictionary of request headers.
+        body (str, optional): The body of the request. Defaults to None.
+        logger (object, optional): A logger instance for logging messages. Defaults to None.
+        engine (object, optional): A template engine instance for rendering templates. Defaults to None.
+        orchestrator (object, optional): An orchestrator instance for submitting tasks. Defaults to None.
+        metadata (dict): A dictionary for storing additional metadata.
+    Methods:
+        add_header(key: str, value: any) -> None:
+            Adds a header to the request.
+        get_header(key: str) -> str | None:
+            Retrieve the value of a specified header.
+        get_body() -> str | None:
+            Retrieve the body of the request, if available.
+        add_metadata(key: str, value: any) -> None:
+            Adds a metadata entry to the request.
+        get_metadata(key: str) -> any:
+            Retrieve the value associated with a given key from the metadata.
+        render_template(template_name: str, context: dict = None) -> str:
+            Renders a template using the injected template engine.
+        submit_task(task: callable, *args):
+            Submit a task to the orchestrator for execution.
+        log(message: str, level: str = "info"):
+            Log a message using the injected logger.
+        as_dict(show_components: bool = False) -> dict:
+            Returns a dictionary representation of the HttpRequest instance.
+    """
+
     def __init__(
         self,
         method,
@@ -121,12 +159,6 @@ class HttpRequest:
         else:
             print(f"[{level.upper()}] {message}")
 
-    def __repr__(self) -> str:
-        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
-
-    def __str__(self) -> str:
-        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
-
     def as_dict(self, show_components: bool = False):
         if show_components:
             return {
@@ -143,6 +175,12 @@ class HttpRequest:
             "path": self.path,
             "headers": self.headers,
         }
+
+    def __repr__(self) -> str:
+        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
+
+    def __str__(self) -> str:
+        return f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={self.metadata}>"
 
 
 class HttpRequestFactory:
