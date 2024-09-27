@@ -33,6 +33,11 @@ class TestHttpRequest(unittest.TestCase):
         self.assertIsNone(self.request.get_metadata("non_existent_key"))
         self.request.add_metadata("session_id", "abc123")
         self.assertEqual(self.request.get_metadata("session_id"), "abc123")
+        
+    def test_get_body(self):
+        self.assertIsNone(self.request.get_body())
+        self.request.body = "Request Body"
+        self.assertEqual(self.request.get_body(), "Request Body")
 
     def test_repr(self):
         expected_repr = f"<HttpRequest method={self.method} path={self.path} headers={self.headers} metadata={{}}>"

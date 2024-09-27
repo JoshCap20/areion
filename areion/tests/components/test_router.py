@@ -21,7 +21,9 @@ class TestRouter(unittest.TestCase):
         # Test adding a dynamic route
         handler = MagicMock()
         self.router.add_route("/user/:id", handler)
-        route_handler, path_params, is_async = self.router.get_handler("GET", "/user/123")
+        route_handler, path_params, is_async = self.router.get_handler(
+            "GET", "/user/123"
+        )
         self.assertEqual(route_handler, handler)
         self.assertEqual(path_params, {"id": "123"})
         self.assertFalse(is_async)
@@ -126,15 +128,18 @@ class TestRouter(unittest.TestCase):
         def simple_middleware(next_handler):
             def wrapper(request, *args, **kwargs):
                 return next_handler(request, *args, **kwargs) + " wrapped"
+
             return wrapper
 
-        @self.router.route("/items/:id", methods=["GET"], middlewares=[simple_middleware])
+        @self.router.route(
+            "/items/:id", methods=["GET"], middlewares=[simple_middleware]
+        )
         def item_handler(request, id):
             return f"Item {id}"
 
         route_handler, path_params, _ = self.router.get_handler("GET", "/items/42")
 
-        response = route_handler("request", id=path_params['id'])
+        response = route_handler("request", id=path_params["id"])
 
         self.assertEqual(response, "Item 42 wrapped")
 
