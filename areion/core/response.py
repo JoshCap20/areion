@@ -67,6 +67,23 @@ HTTP_STATUS_CODES: dict[int, str] = {
     511: "Network Authentication Required",
 }
 
+class ContentType:
+    JSON = "application/json"
+    HTML = "text/html"
+    OCTET_STREAM = "application/octet-stream"
+    PLAIN = "text/plain"
+
+    TYPE_MAP = {
+        str: PLAIN,
+        dict: JSON,
+        bytes: OCTET_STREAM,
+    }
+    
+    @classmethod
+    def map_type_to_content_type(cls, body) -> str:
+        if isinstance(body, str) and body.startswith("<"):
+            return ContentType.HTML
+        return cls.TYPE_MAP.get(type(body), cls.PLAIN)
 
 class HttpResponse:
     def __init__(self, body=None, status_code=200, content_type=None, headers=None):
@@ -96,13 +113,7 @@ class HttpResponse:
         Returns:
             str: The inferred content type.
         """
-        if isinstance(body, dict):
-            return "application/json"
-        elif isinstance(body, str) and body.startswith("<"):
-            return "text/html"
-        elif isinstance(body, bytes):
-            return "application/octet-stream"
-        return "text/plain"  # Default content type
+        return ContentType.map_type_to_content_type(body)
 
     def _format_body(self):
         """
