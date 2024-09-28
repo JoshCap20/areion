@@ -368,7 +368,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         mock_reader.readexactly = AsyncMock(return_value=b"")
 
         # Mock request_factory
-        mock_request = HttpRequest("GET", "/error", {"Host": "localhost"}, b"")
+        mock_request = HttpRequest("GET", "/error", {"Host": "localhost", "Connection": "close"}, b"")
         self.mock_request_factory.create.return_value = mock_request
 
         # Mock router handler to raise HttpError

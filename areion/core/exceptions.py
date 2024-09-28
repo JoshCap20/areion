@@ -3,6 +3,7 @@ Custom exceptions for Areion.
 
 These are globally handled in the core server.
 """
+from .response import HTTP_STATUS_CODES
 
 
 class HttpError(Exception):
@@ -11,8 +12,11 @@ class HttpError(Exception):
     status_code: int = 500
     message: str = "Internal Server Error"
 
-    def __init__(self, message: str = None):
-        if message:
+    def __init__(self, message: str = None, status_code: int = None):
+        self.status_code = status_code or self.status_code
+        if status_code and not message:
+            self.message = HTTP_STATUS_CODES.get(status_code, "Internal Server Error")
+        elif message:
             self.message = message
         super().__init__(self.message)
 
