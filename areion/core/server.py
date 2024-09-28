@@ -34,6 +34,7 @@ class HttpServer:
 
         self.semaphore = asyncio.Semaphore(max_conns)
         self.router = router
+        self.max_conns = max_conns
         self.request_factory = request_factory
         self.host = host
         self.port = port
@@ -69,15 +70,15 @@ class HttpServer:
                     reader.readuntil(b"\r\n\r\n"), timeout=self.keep_alive_timeout
                 )
             except asyncio.TimeoutError:
-                response = HttpResponse(status_code=408, body=HTTP_STATUS_CODES[408])
+                response = HttpResponse(status_code=408, body=HTTP_STATUS_CODES[408], content_type="text/plain")
                 await self._send_response(writer, response)
                 break
             except asyncio.IncompleteReadError:
-                response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400])
+                response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400], content_type="text/plain")
                 await self._send_response(writer, response)
                 break
             except asyncio.LimitOverrunError:
-                response = HttpResponse(status_code=413, body=HTTP_STATUS_CODES[413])
+                response = HttpResponse(status_code=413, body=HTTP_STATUS_CODES[413], content_type="text/plain")
                 await self._send_response(writer, response)
                 break
 
@@ -89,7 +90,7 @@ class HttpServer:
                 request_line, headers = self._parse_headers(headers_data)
                 method, path, http_version = request_line
             except Exception as e:
-                response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400])
+                response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400], content_type="text/plain")
                 await self._send_response(writer, response)
                 self.log("error", f"Error parsing headers: {e}")
                 break
@@ -114,13 +115,13 @@ class HttpServer:
                     )
                 except asyncio.TimeoutError:
                     response = HttpResponse(
-                        status_code=408, body=HTTP_STATUS_CODES[408]
+                        status_code=408, body=HTTP_STATUS_CODES[408], content_type="text/plain"
                     )
                     await self._send_response(writer, response)
                     break
                 except Exception as e:
                     response = HttpResponse(
-                        status_code=400, body=HTTP_STATUS_CODES[400]
+                        status_code=400, body=HTTP_STATUS_CODES[400], content_type="text/plain"
                     )
                     await self._send_response(writer, response)
                     self.log("error", f"Error reading body: {e}")
@@ -143,6 +144,7 @@ class HttpServer:
                     response = HttpResponse(
                         status_code=405,
                         body=HTTP_STATUS_CODES[405],
+                        content_type="text/plain",
                         headers={"Allow": ", ".join(allowed_methods)},
                     )
                     await self._send_response(writer, response)
@@ -150,7 +152,7 @@ class HttpServer:
 
                 # Handle OPTIONS and HEAD requests
                 if method == "OPTIONS":
-                    response = HttpResponse(status_code=204)
+                    response = HttpResponse(status_code=204, body="")
                     response.set_header(
                         "Allow", ", ".join(self.router.get_allowed_methods(path))
                     )
@@ -158,7 +160,7 @@ class HttpServer:
                     response = await handler(request, **path_params)
                     response.body = b""
                 elif request.method == "CONNECT":
-                    response = HttpResponse(status_code=501, body="Not Implemented")
+                    response = HttpResponse(status_code=501, body="Not Implemented", content_type="text/plain")
                 else:
                     if is_async:
                         response = await handler(request, **path_params)
@@ -167,11 +169,11 @@ class HttpServer:
 
             except HttpError as e:
                 # Handles web exceptions raised by route handler
-                response = HttpResponse(status_code=e.status_code, body=str(e))
+                response = HttpResponse(status_code=e.status_code, body=str(e), content_type="text/plain")
                 self.log("warning", f"[RESPONSE][HTTP-ERROR] {e}")
             except Exception as e:
                 # Handles all other exceptions
-                response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500])
+                response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500], content_type="text/plain")
                 self.log("error", f"[RESPONSE][ERROR] {e}")
 
             await self._send_response(writer=writer, response=response)
