@@ -68,8 +68,28 @@ HTTP_STATUS_CODES: dict[int, str] = {
 }
 
 
+class ContentType:
+    JSON = "application/json"
+    HTML = "text/html"
+    OCTET_STREAM = "application/octet-stream"
+    PLAIN = "text/plain"
+
+    TYPE_MAP = {
+        str: PLAIN,
+        dict: JSON,
+        bytes: OCTET_STREAM,
+    }
+
+    @classmethod
+    def map_type_to_content_type(cls, body: any) -> str:
+        body_type = type(body)
+        if body_type == str and body.startswith("<"):
+            return ContentType.HTML
+        return cls.TYPE_MAP.get(body_type, cls.PLAIN)
+
+
 class HttpResponse:
-    def __init__(self, body=None, status_code=200, content_type=None, headers=None):
+    def __init__(self, body="", status_code=200, content_type=None, headers=None):
         """
         Initializes the HttpResponse object.
 
@@ -86,7 +106,7 @@ class HttpResponse:
 
         self.headers["Content-Type"] = self.content_type
 
-    def _infer_content_type(self, body) -> str:
+    def _infer_content_type(self, body: any) -> str:
         """
         Infer the content type based on the body type.
 
@@ -96,30 +116,25 @@ class HttpResponse:
         Returns:
             str: The inferred content type.
         """
-        if isinstance(body, dict):
-            return "application/json"
-        elif isinstance(body, str) and body.startswith("<"):
-            return "text/html"
-        elif isinstance(body, bytes):
-            return "application/octet-stream"
-        return "text/plain"  # Default content type
+        return ContentType.map_type_to_content_type(body)
 
-    def _format_body(self):
+    def _format_body(self) -> bytes:
         """
         Format the body depending on its type (e.g., convert dict to JSON).
 
         Returns:
-            str or bytes: The formatted body.
+            bytes: The formatted body.
         """
-        if isinstance(self.body, dict):
-            return orjson.dumps(self.body)
-        elif isinstance(self.body, str):
-            return self.body.encode("utf-8")  # Convert string to bytes
-        elif isinstance(self.body, bytes):
-            return self.body  # Return bytes as-is
-        return str(self.body).encode(
-            "utf-8"
-        )  # Convert other types to string and encode
+        body_type = type(self.body)
+
+        body_type_map = {
+            str: lambda body: body.encode("utf-8"),
+            dict: lambda body: orjson.dumps(body),
+            bytes: lambda body: body,
+        }
+
+        formatter = body_type_map.get(body_type, lambda body: str(body).encode("utf-8"))
+        return formatter(self.body)
 
     def _get_status_phrase(self) -> str:
         """
@@ -174,7 +189,7 @@ class HttpResponse:
             value (any): The value of the header.
         """
         self.headers[key] = value
-        
+
     def set_headers(self, headers: dict) -> None:
         """
         Set multiple headers in the response.
@@ -183,7 +198,7 @@ class HttpResponse:
             headers (dict): A dictionary of headers to set.
         """
         self.headers.update(headers)
-        
+
     def set_status_code(self, status_code: int) -> None:
         """
         Set the status code of the response.

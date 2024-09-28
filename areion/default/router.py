@@ -41,7 +41,15 @@ class Router:
 
     def __init__(self):
         self.root = TrieNode()
-        self.allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+        self.allowed_methods = [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "PATCH",
+            "HEAD",
+            "OPTIONS",
+        ]
         self.middlewares = {}
         self.global_middlewares = []
         self.route_info = []
@@ -227,7 +235,7 @@ class Router:
             middleware (callable): A callable that represents the middleware to be added.
         """
         self.global_middlewares.append(middleware)
-        
+
     def get_allowed_methods(self, path: str) -> list[str]:
         """
         Returns a list of allowed methods for a given path.
@@ -244,12 +252,12 @@ class Router:
         return list(current_node.handler.keys())
 
     ### Utility Methods ###
-    
+
     def _remove_query_params(self, path: str) -> str:
         """
         Removes query parameters from the path.
         """
-        return path.split('?', 1)[0]
+        return path.split("?", 1)[0]
 
     def _split_path(self, path: str) -> list:
         """
@@ -267,7 +275,7 @@ class Router:
             Checks if a method exists for a given path.
             """
             path = self._remove_query_params(path)
-            
+
             segments = self._split_path(path)
             current_node = self.root
             for segment in segments:

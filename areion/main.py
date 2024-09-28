@@ -129,7 +129,7 @@ class AreionServer:
         )
 
         # Start the HTTP server
-        server_task = asyncio.create_task(self.http_server.start())
+        server_task = asyncio.create_task(self.http_server.run())
 
         # Wait for shutdown signal
         await self._shutdown_event.wait()
