@@ -115,22 +115,23 @@ class HttpResponse:
         """
         return ContentType.map_type_to_content_type(body)
 
-    def _format_body(self):
+    def _format_body(self) -> bytes:
         """
         Format the body depending on its type (e.g., convert dict to JSON).
 
         Returns:
-            str or bytes: The formatted body.
+            bytes: The formatted body.
         """
-        if isinstance(self.body, dict):
-            return orjson.dumps(self.body)
-        elif isinstance(self.body, str):
-            return self.body.encode("utf-8")  # Convert string to bytes
-        elif isinstance(self.body, bytes):
-            return self.body  # Return bytes as-is
-        return str(self.body).encode(
-            "utf-8"
-        )  # Convert other types to string and encode
+        body_type = type(self.body)
+        
+        body_type_map = {
+            str: lambda body: body.encode("utf-8"),
+            dict: lambda body: orjson.dumps(body),
+            bytes: lambda body: body,
+        }
+        
+        formatter = body_type_map.get(body_type, lambda body: str(body).encode("utf-8"))
+        return formatter(self.body)
 
     def _get_status_phrase(self) -> str:
         """
