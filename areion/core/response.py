@@ -67,6 +67,7 @@ HTTP_STATUS_CODES: dict[int, str] = {
     511: "Network Authentication Required",
 }
 
+
 class ContentType:
     JSON = "application/json"
     HTML = "text/html"
@@ -78,13 +79,14 @@ class ContentType:
         dict: JSON,
         bytes: OCTET_STREAM,
     }
-    
+
     @classmethod
     def map_type_to_content_type(cls, body: any) -> str:
         body_type = type(body)
         if body_type == str and body.startswith("<"):
             return ContentType.HTML
         return cls.TYPE_MAP.get(body_type, cls.PLAIN)
+
 
 class HttpResponse:
     def __init__(self, body="", status_code=200, content_type=None, headers=None):
@@ -124,13 +126,13 @@ class HttpResponse:
             bytes: The formatted body.
         """
         body_type = type(self.body)
-        
+
         body_type_map = {
             str: lambda body: body.encode("utf-8"),
             dict: lambda body: orjson.dumps(body),
             bytes: lambda body: body,
         }
-        
+
         formatter = body_type_map.get(body_type, lambda body: str(body).encode("utf-8"))
         return formatter(self.body)
 
@@ -187,7 +189,7 @@ class HttpResponse:
             value (any): The value of the header.
         """
         self.headers[key] = value
-        
+
     def set_headers(self, headers: dict) -> None:
         """
         Set multiple headers in the response.
@@ -196,7 +198,7 @@ class HttpResponse:
             headers (dict): A dictionary of headers to set.
         """
         self.headers.update(headers)
-        
+
     def set_status_code(self, status_code: int) -> None:
         """
         Set the status code of the response.

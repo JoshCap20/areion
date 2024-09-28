@@ -70,15 +70,27 @@ class HttpServer:
                     reader.readuntil(b"\r\n\r\n"), timeout=self.keep_alive_timeout
                 )
             except asyncio.TimeoutError:
-                response = HttpResponse(status_code=408, body=HTTP_STATUS_CODES[408], content_type="text/plain")
+                response = HttpResponse(
+                    status_code=408,
+                    body=HTTP_STATUS_CODES[408],
+                    content_type="text/plain",
+                )
                 await self._send_response(writer, response)
                 break
             except asyncio.IncompleteReadError:
-                response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400], content_type="text/plain")
+                response = HttpResponse(
+                    status_code=400,
+                    body=HTTP_STATUS_CODES[400],
+                    content_type="text/plain",
+                )
                 await self._send_response(writer, response)
                 break
             except asyncio.LimitOverrunError:
-                response = HttpResponse(status_code=413, body=HTTP_STATUS_CODES[413], content_type="text/plain")
+                response = HttpResponse(
+                    status_code=413,
+                    body=HTTP_STATUS_CODES[413],
+                    content_type="text/plain",
+                )
                 await self._send_response(writer, response)
                 break
 
@@ -90,7 +102,11 @@ class HttpServer:
                 request_line, headers = self._parse_headers(headers_data)
                 method, path, http_version = request_line
             except Exception as e:
-                response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400], content_type="text/plain")
+                response = HttpResponse(
+                    status_code=400,
+                    body=HTTP_STATUS_CODES[400],
+                    content_type="text/plain",
+                )
                 await self._send_response(writer, response)
                 self.log("error", f"Error parsing headers: {e}")
                 break
@@ -115,13 +131,17 @@ class HttpServer:
                     )
                 except asyncio.TimeoutError:
                     response = HttpResponse(
-                        status_code=408, body=HTTP_STATUS_CODES[408], content_type="text/plain"
+                        status_code=408,
+                        body=HTTP_STATUS_CODES[408],
+                        content_type="text/plain",
                     )
                     await self._send_response(writer, response)
                     break
                 except Exception as e:
                     response = HttpResponse(
-                        status_code=400, body=HTTP_STATUS_CODES[400], content_type="text/plain"
+                        status_code=400,
+                        body=HTTP_STATUS_CODES[400],
+                        content_type="text/plain",
                     )
                     await self._send_response(writer, response)
                     self.log("error", f"Error reading body: {e}")
@@ -160,7 +180,11 @@ class HttpServer:
                     response = await handler(request, **path_params)
                     response.body = b""
                 elif request.method == "CONNECT":
-                    response = HttpResponse(status_code=501, body=HTTP_STATUS_CODES[501], content_type="text/plain")
+                    response = HttpResponse(
+                        status_code=501,
+                        body=HTTP_STATUS_CODES[501],
+                        content_type="text/plain",
+                    )
                 else:
                     if is_async:
                         response = await handler(request, **path_params)
@@ -169,12 +193,18 @@ class HttpServer:
 
             except HttpError as e:
                 # Handles web exceptions raised by route handler
-                response = HttpResponse(status_code=e.status_code, body=e.message, content_type="text/plain")
+                response = HttpResponse(
+                    status_code=e.status_code, body=e.message, content_type="text/plain"
+                )
                 self.log("warning", f"[RESPONSE][HTTP-ERROR] {e}")
             except Exception as e:
                 # Handles all other exceptions
                 # TODO: Return exception details only in debug mode
-                response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500], content_type="text/plain")
+                response = HttpResponse(
+                    status_code=500,
+                    body=HTTP_STATUS_CODES[500],
+                    content_type="text/plain",
+                )
                 self.log("error", f"[RESPONSE][ERROR] {e}")
 
             await self._send_response(writer=writer, response=response)
@@ -186,7 +216,7 @@ class HttpServer:
                     and request.headers["Connection"].lower() == "close"
                 ):
                     break
-            else:  
+            else:
                 # HTTP/1.0 or earlier
                 if (
                     "Connection" not in request.headers
@@ -227,7 +257,6 @@ class HttpServer:
         )
         async with self._server:
             await self._shutdown_event.wait()
-            
 
     async def stop(self):
         if self._server:

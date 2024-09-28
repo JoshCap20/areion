@@ -171,7 +171,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
     async def test_handle_client_incomplete_read(self):
         mock_reader = AsyncMock()
         mock_writer = MagicMock()
-        
+
         # Simulate incomplete read
         mock_reader.readuntil = AsyncMock(
             side_effect=asyncio.IncompleteReadError(partial=b"GET /", expected=10)
@@ -189,7 +189,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
     async def test_handle_client_limit_overrun(self):
         mock_reader = AsyncMock()
         mock_writer = MagicMock()
-        
+
         # Simulate limit overrun
         mock_reader.readuntil = AsyncMock(
             side_effect=asyncio.LimitOverrunError(consumed=10, message=b"")
@@ -207,7 +207,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
     async def test_handle_client_invalid_headers(self):
         mock_reader = AsyncMock()
         mock_writer = MagicMock()
-        
+
         # Malformed headers
         malformed_headers = b"INVALID HEADER\r\n\r\n"
         mock_reader.readuntil = AsyncMock(return_value=malformed_headers)
@@ -224,7 +224,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
     async def test_handle_client_chunked_transfer_encoding(self):
         mock_reader = AsyncMock()
         mock_writer = MagicMock()
-        
+
         # Headers with Transfer-Encoding: chunked
         headers = b"GET /test HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n"
         mock_reader.readuntil = AsyncMock(return_value=headers)
@@ -306,15 +306,26 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parsed_response["reason_phrase"], "No Content")
 
         for key, value in expected_headers.items():
-            self.assertIn(key, parsed_response["headers"], f"Header '{key}' not found in response.")
-            self.assertEqual(parsed_response["headers"][key], value, f"Header '{key}' has incorrect value.")
-        self.assertEqual(parsed_response["body"], b"", "Response body should be empty for 204 No Content.")
+            self.assertIn(
+                key,
+                parsed_response["headers"],
+                f"Header '{key}' not found in response.",
+            )
+            self.assertEqual(
+                parsed_response["headers"][key],
+                value,
+                f"Header '{key}' has incorrect value.",
+            )
+        self.assertEqual(
+            parsed_response["body"],
+            b"",
+            "Response body should be empty for 204 No Content.",
+        )
 
         mock_writer.close.assert_not_called()
 
         # Assert that the handler was not called since OPTIONS is handled directly
         mock_handler.assert_not_called()
-
 
     async def test_handle_client_head_method(self):
         mock_reader = AsyncMock()
@@ -368,7 +379,9 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         mock_reader.readexactly = AsyncMock(return_value=b"")
 
         # Mock request_factory
-        mock_request = HttpRequest("GET", "/error", {"Host": "localhost", "Connection": "close"}, b"")
+        mock_request = HttpRequest(
+            "GET", "/error", {"Host": "localhost", "Connection": "close"}, b""
+        )
         self.mock_request_factory.create.return_value = mock_request
 
         # Mock router handler to raise HttpError
@@ -427,7 +440,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         # Verify that the handler was called
         mock_handler.assert_awaited_with(mock_request, **{})
-        
+
         expected_response = HttpResponse(status_code=200, body=b"OK")
         mock_writer.write.assert_called_with(expected_response.format_response())
 
@@ -555,7 +568,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(self.server.semaphore._value, 2)
 
-# # TODO: Uncomment after keep alive is implemented
+    # # TODO: Uncomment after keep alive is implemented
     # async def test_keep_alive_timeout(self):
     #     mock_reader = AsyncMock()
     #     mock_writer = MagicMock()
@@ -599,6 +612,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         # Verify that connection was closed
         mock_writer.is_closing.assert_called()
+
     async def test_handle_connection_reset(self):
         mock_reader = AsyncMock()
         mock_writer = MagicMock()
@@ -609,8 +623,8 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         mock_writer.write.assert_not_called()
         mock_writer.is_closing.assert_called()
-        
-# # TODO: Uncomment after keep alive is implemented
+
+    # # TODO: Uncomment after keep alive is implemented
     # async def test_handle_multiple_requests_keep_alive(self):
     #     mock_reader = AsyncMock()
     #     mock_writer = MagicMock()
@@ -659,24 +673,24 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
     #     # Verify that connection was closed after second request
     #     mock_writer.is_closing.assert_called()
-    
+
     # Helper method to parse HTTP response
     def parse_http_response(self, response_bytes):
         response_stream = BytesIO(response_bytes)
         # Read status line
-        status_line = response_stream.readline().decode('iso-8859-1').strip()
-        parts = status_line.split(' ', 2)
+        status_line = response_stream.readline().decode("iso-8859-1").strip()
+        parts = status_line.split(" ", 2)
         http_version = parts[0]
         status_code = int(parts[1])
-        reason_phrase = parts[2] if len(parts) > 2 else ''
+        reason_phrase = parts[2] if len(parts) > 2 else ""
 
         # Read headers
         headers = {}
         while True:
-            line = response_stream.readline().decode('iso-8859-1').strip()
+            line = response_stream.readline().decode("iso-8859-1").strip()
             if not line:
                 break
-            key, value = line.split(':', 1)
+            key, value = line.split(":", 1)
             headers[key.strip()] = value.strip()
 
         # Read body

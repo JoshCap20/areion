@@ -3,6 +3,7 @@ Custom exceptions for Areion.
 
 These are globally handled in the core server.
 """
+
 from .response import HTTP_STATUS_CODES
 
 
