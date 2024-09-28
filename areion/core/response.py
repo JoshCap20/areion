@@ -80,13 +80,14 @@ class ContentType:
     }
     
     @classmethod
-    def map_type_to_content_type(cls, body) -> str:
-        if isinstance(body, str) and body.startswith("<"):
+    def map_type_to_content_type(cls, body: any) -> str:
+        body_type = type(body)
+        if body_type == str and body.startswith("<"):
             return ContentType.HTML
-        return cls.TYPE_MAP.get(type(body), cls.PLAIN)
+        return cls.TYPE_MAP.get(body_type, cls.PLAIN)
 
 class HttpResponse:
-    def __init__(self, body=None, status_code=200, content_type=None, headers=None):
+    def __init__(self, body="", status_code=200, content_type=None, headers=None):
         """
         Initializes the HttpResponse object.
 
@@ -103,7 +104,7 @@ class HttpResponse:
 
         self.headers["Content-Type"] = self.content_type
 
-    def _infer_content_type(self, body) -> str:
+    def _infer_content_type(self, body: any) -> str:
         """
         Infer the content type based on the body type.
 

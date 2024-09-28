@@ -1,4 +1,5 @@
 import unittest
+from io import BytesIO
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, call
 
@@ -239,7 +240,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
     async def test_handle_client_method_not_allowed(self):
         mock_reader = AsyncMock()
-        mock_writer = MagicMock()
+        mock_writer = AsyncMock()
         request_headers = b"POST /test HTTP/1.1\r\nHost: localhost\r\n\r\n"
         mock_reader.readuntil = AsyncMock(return_value=request_headers)
         mock_reader.readexactly = AsyncMock(return_value=b"")
@@ -257,13 +258,13 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         await self.server._handle_client(mock_reader, mock_writer)
 
         # Verify that a 405 response was sent with Allow header
-        response = HttpResponse(
+        expected_response = HttpResponse(
             status_code=405,
             body=HTTP_STATUS_CODES[405],
             content_type="text/plain",
             headers={"Allow": "GET, OPTIONS"},
         )
-        mock_writer.write.assert_called_with(response.format_response())
+        mock_writer.write.assert_called_with(expected_response.format_response())
 
         # Verify that connection was closed
         mock_writer.is_closing.assert_called()
@@ -285,14 +286,35 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         await self.server._handle_client(mock_reader, mock_writer)
 
-        # Verify that a 204 response was sent with Allow header
-        response = HttpResponse(
-            status_code=204, headers={"Allow": "GET, POST, OPTIONS"}
-        )
-        mock_writer.write.assert_called_with(response.format_response())
+        expected_headers = {
+            "Allow": "GET, POST, OPTIONS",
+            "Content-Type": "text/plain",
+            "Server": "Areion",
+            "Content-Length": "0",
+        }
 
-        # Verify that connection was closed if needed
-        mock_writer.is_closing.assert_not_called()  # 204 does not close connection by default
+        # Capture the actual response bytes passed to writer.write
+        actual_write_call = mock_writer.write.call_args
+        self.assertIsNotNone(actual_write_call, "write was not called on the writer.")
+        actual_response_bytes = actual_write_call[0][0]
+
+        # Parse the actual response
+        parsed_response = self.parse_http_response(actual_response_bytes)
+
+        self.assertEqual(parsed_response["http_version"], "HTTP/1.1")
+        self.assertEqual(parsed_response["status_code"], 204)
+        self.assertEqual(parsed_response["reason_phrase"], "No Content")
+
+        for key, value in expected_headers.items():
+            self.assertIn(key, parsed_response["headers"], f"Header '{key}' not found in response.")
+            self.assertEqual(parsed_response["headers"][key], value, f"Header '{key}' has incorrect value.")
+        self.assertEqual(parsed_response["body"], b"", "Response body should be empty for 204 No Content.")
+
+        mock_writer.close.assert_not_called()
+
+        # Assert that the handler was not called since OPTIONS is handled directly
+        mock_handler.assert_not_called()
+
 
     async def test_handle_client_head_method(self):
         mock_reader = AsyncMock()
@@ -335,13 +357,12 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         await self.server._handle_client(mock_reader, mock_writer)
 
-        # Verify that a 501 response was sent
         response = HttpResponse(status_code=501, body="Not Implemented")
         mock_writer.write.assert_called_with(response.format_response())
 
     async def test_handle_client_handler_http_error(self):
         mock_reader = AsyncMock()
-        mock_writer = MagicMock()
+        mock_writer = AsyncMock()
         request_headers = b"GET /error HTTP/1.1\r\nHost: localhost\r\n\r\n"
         mock_reader.readuntil = AsyncMock(return_value=request_headers)
         mock_reader.readexactly = AsyncMock(return_value=b"")
@@ -358,7 +379,6 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         await self.server._handle_client(mock_reader, mock_writer)
 
-        # Verify that a 404 response was sent
         response = HttpResponse(status_code=404, body="Not Found")
         mock_writer.write.assert_called_with(response.format_response())
 
@@ -381,7 +401,6 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         await self.server._handle_client(mock_reader, mock_writer)
 
-        # Verify that a 500 response was sent
         response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500])
         mock_writer.write.assert_called_with(response.format_response())
 
@@ -408,21 +427,18 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         # Verify that the handler was called
         mock_handler.assert_awaited_with(mock_request, **{})
-        # Verify that response was sent
+        
         expected_response = HttpResponse(status_code=200, body=b"OK")
         mock_writer.write.assert_called_with(expected_response.format_response())
 
-        # Verify that connection was closed
         mock_writer.is_closing.assert_called()
 
     async def test_send_response_non_http_response(self):
-        # Mock writer
         mock_writer = AsyncMock()
         # Call _send_response with non-HttpResponse
         response_body = "Simple Response"
         await self.server._send_response(writer=mock_writer, response=response_body)
 
-        # Verify that HttpResponse was created and sent
         response = HttpResponse(body=response_body)
         mock_writer.write.assert_called_with(response.format_response())
 
@@ -441,43 +457,32 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Invalid headers", str(context.exception))
 
     async def test_start_and_stop_server(self):
-        # Mock asyncio.start_server
         mock_server = AsyncMock()
         mock_server.__aenter__.return_value = mock_server
         mock_server.wait_closed = AsyncMock()
         with mock.patch("asyncio.start_server", return_value=mock_server):
-            # Start the server in a separate task
             start_task = asyncio.create_task(self.server.start())
-            # Allow some time for the server to start
             await asyncio.sleep(0.1)
-            # Verify that start_server was called with correct parameters
             asyncio.start_server.assert_called_with(
                 self.server._handle_client, self.server.host, self.server.port
             )
-            # Trigger shutdown
             self.server._shutdown_event.set()
             await start_task
-            # Verify that server was awaited
             mock_server.__aenter__.assert_called()
-            mock_server.wait_closed.assert_not_called()  # wait_closed called on stop
+            mock_server.wait_closed.assert_not_called()
 
     async def test_stop_server(self):
-        # Mock server
         self.server._server = AsyncMock()
         self.server._server.close = MagicMock()
         self.server._server.wait_closed = AsyncMock()
 
         await self.server.stop()
-
-        # Verify that server.close and wait_closed were called
         self.server._server.close.assert_called()
 
     async def test_run_server(self):
-        # Mock start and stop
         self.server.start = AsyncMock()
         self.server.stop = AsyncMock()
 
-        # Run the server in a task
         run_task = asyncio.create_task(self.server.run())
 
         # Simulate shutdown event
@@ -485,22 +490,16 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         self.server._shutdown_event.set()
         await run_task
 
-        # Verify that start was called
         self.server.start.assert_awaited()
-        # Verify that stop was not called since no exception
         self.server.stop.assert_not_called()
 
     async def test_run_server_keyboard_interrupt(self):
-        # Mock start to raise KeyboardInterrupt
         self.server.start = AsyncMock(side_effect=KeyboardInterrupt)
         self.server.stop = AsyncMock()
 
-        # Run the server
         await self.server.run()
 
-        # Verify that start was called
         self.server.start.assert_awaited()
-        # Verify that stop was called due to KeyboardInterrupt
         self.server.stop.assert_awaited()
 
     def test_logging_with_logger(self):
@@ -660,6 +659,36 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
     #     # Verify that connection was closed after second request
     #     mock_writer.is_closing.assert_called()
+    
+    # Helper method to parse HTTP response
+    def parse_http_response(self, response_bytes):
+        response_stream = BytesIO(response_bytes)
+        # Read status line
+        status_line = response_stream.readline().decode('iso-8859-1').strip()
+        parts = status_line.split(' ', 2)
+        http_version = parts[0]
+        status_code = int(parts[1])
+        reason_phrase = parts[2] if len(parts) > 2 else ''
+
+        # Read headers
+        headers = {}
+        while True:
+            line = response_stream.readline().decode('iso-8859-1').strip()
+            if not line:
+                break
+            key, value = line.split(':', 1)
+            headers[key.strip()] = value.strip()
+
+        # Read body
+        body = response_stream.read()
+
+        return {
+            "http_version": http_version,
+            "status_code": status_code,
+            "reason_phrase": reason_phrase,
+            "headers": headers,
+            "body": body,
+        }
 
 
 if __name__ == "__main__":
