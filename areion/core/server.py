@@ -160,7 +160,7 @@ class HttpServer:
                     response = await handler(request, **path_params)
                     response.body = b""
                 elif request.method == "CONNECT":
-                    response = HttpResponse(status_code=501, body="Not Implemented", content_type="text/plain")
+                    response = HttpResponse(status_code=501, body=HTTP_STATUS_CODES[501], content_type="text/plain")
                 else:
                     if is_async:
                         response = await handler(request, **path_params)
@@ -169,20 +169,30 @@ class HttpServer:
 
             except HttpError as e:
                 # Handles web exceptions raised by route handler
-                response = HttpResponse(status_code=e.status_code, body=str(e), content_type="text/plain")
+                response = HttpResponse(status_code=e.status_code, body=e.message, content_type="text/plain")
                 self.log("warning", f"[RESPONSE][HTTP-ERROR] {e}")
             except Exception as e:
                 # Handles all other exceptions
+                # TODO: Return exception details only in debug mode
                 response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500], content_type="text/plain")
                 self.log("error", f"[RESPONSE][ERROR] {e}")
 
             await self._send_response(writer=writer, response=response)
 
-            if (
-                "Connection" in request.headers
-                and request.headers["Connection"].lower() == "close"
-            ):
-                break
+            # Handle keep-alive
+            if http_version == "HTTP/1.1":
+                if (
+                    "Connection" in request.headers
+                    and request.headers["Connection"].lower() == "close"
+                ):
+                    break
+            else:  
+                # HTTP/1.0 or earlier
+                if (
+                    "Connection" not in request.headers
+                    or request.headers["Connection"].lower() != "keep-alive"
+                ):
+                    break
 
     def _parse_headers(self, headers_data):
         try:
