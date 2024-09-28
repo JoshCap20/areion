@@ -217,11 +217,12 @@ class HttpServer:
         )
         async with self._server:
             await self._shutdown_event.wait()
+            
 
     async def stop(self):
-        if self.server:
-            self.server.close()
-            await self.server.wait_closed()
+        if self._server:
+            self._server.close()
+            await self._server.wait_closed()
 
     async def run(self, *args, **kwargs):
         try:
