@@ -260,6 +260,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         response = HttpResponse(
             status_code=405,
             body=HTTP_STATUS_CODES[405],
+            content_type="text/plain",
             headers={"Allow": "GET, OPTIONS"},
         )
         mock_writer.write.assert_called_with(response.format_response())
@@ -416,13 +417,13 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_response_non_http_response(self):
         # Mock writer
-        mock_writer = MagicMock()
+        mock_writer = AsyncMock()
         # Call _send_response with non-HttpResponse
         response_body = "Simple Response"
         await self.server._send_response(writer=mock_writer, response=response_body)
 
         # Verify that HttpResponse was created and sent
-        response = HttpResponse(body=response_body.encode())
+        response = HttpResponse(body=response_body)
         mock_writer.write.assert_called_with(response.format_response())
 
     async def test_parse_headers_valid(self):
