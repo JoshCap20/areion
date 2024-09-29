@@ -1,6 +1,10 @@
 # Areion Server
 
-[![PyPi][pypi-shield]][pypi-url] [![PyPi][pypiversion-shield]][pypi-url] [![License][license-shield]][license-url]
+
+[![License][license-shield]][license-url] [![Downloads](https://static.pepy.tech/badge/areion)](https://pepy.tech/project/areion)
+[![Downloads](https://static.pepy.tech/badge/areion/month)](https://pepy.tech/project/areion)
+
+[![PyPi][pypi-shield]][pypi-url] [![PyPi][pypiversion-shield]][pypi-url] 
 
 Welcome to the Areion HTTP Server documentation. Areion is a lightweight, asynchronous HTTP server written in Python, designed for simplicity and extensibility. This documentation provides a comprehensive guide to using Areion, covering everything from getting started to advanced usage and component details.
 
