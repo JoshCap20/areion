@@ -32,16 +32,17 @@ class HttpServer:
         if not isinstance(keep_alive_timeout, int) or keep_alive_timeout <= 0:
             raise ValueError("Keep alive timeout must be a positive integer.")
 
-        self.semaphore = asyncio.Semaphore(max_conns)
         self.router = router
         self.max_conns = max_conns
         self.request_factory = request_factory
-        self.host = host
-        self.port = port
-        self.buffer_size = buffer_size
-        self.keep_alive_timeout = keep_alive_timeout
+        self.host: str = host
+        self.port: int = port
+        self.buffer_size: int = buffer_size
+        self.max_conns: int = max_conns
+        self.keep_alive_timeout: int = keep_alive_timeout
         self._shutdown_event = asyncio.Event()
         self.logger = logger
+        # self.semaphore = asyncio.Semaphore(max_conns) # TODO: Figure out performance tradeoffs of using semaphore
 
     async def _handle_client(self, reader, writer):
         try:
@@ -62,8 +63,9 @@ class HttpServer:
             self.log("debug", "Connection reset by peer.")
 
     async def _handle_request_logic(self, reader, writer):
+        keep_alive: bool = True
         # HttpErrors are NOT handled correctly outside of this method
-        while True:
+        while keep_alive:
             # Handle request reading
             try:
                 headers_data = await asyncio.wait_for(
@@ -74,6 +76,7 @@ class HttpServer:
                     status_code=408,
                     body=HTTP_STATUS_CODES[408],
                     content_type="text/plain",
+                    headers={"Connection": "close"},
                 )
                 await self._send_response(writer, response)
                 break
@@ -82,6 +85,7 @@ class HttpServer:
                     status_code=400,
                     body=HTTP_STATUS_CODES[400],
                     content_type="text/plain",
+                    headers={"Connection": "close"},
                 )
                 await self._send_response(writer, response)
                 break
@@ -90,6 +94,7 @@ class HttpServer:
                     status_code=413,
                     body=HTTP_STATUS_CODES[413],
                     content_type="text/plain",
+                    headers={"Connection": "close"},
                 )
                 await self._send_response(writer, response)
                 break
@@ -106,6 +111,7 @@ class HttpServer:
                     status_code=400,
                     body=HTTP_STATUS_CODES[400],
                     content_type="text/plain",
+                    headers={"Connection": "close"},
                 )
                 await self._send_response(writer, response)
                 self.log("error", f"Error parsing headers: {e}")
@@ -117,7 +123,12 @@ class HttpServer:
             # TODO: Handle Transfer-Encoding
             transfer_encoding = headers.get("Transfer-Encoding", "").lower()
             if "chunked" in transfer_encoding:
-                response = HttpResponse(status_code=501, body="Not Implemented")
+                response = HttpResponse(
+                    status_code=501,
+                    body="Not Implemented",
+                    content_type="text/plain",
+                    headers={"Connection": "close"},
+                )
                 await self._send_response(writer, response)
                 break
 
@@ -134,6 +145,7 @@ class HttpServer:
                         status_code=408,
                         body=HTTP_STATUS_CODES[408],
                         content_type="text/plain",
+                        headers={"Connection": "close"},
                     )
                     await self._send_response(writer, response)
                     break
@@ -142,6 +154,7 @@ class HttpServer:
                         status_code=400,
                         body=HTTP_STATUS_CODES[400],
                         content_type="text/plain",
+                        headers={"Connection": "close"},
                     )
                     await self._send_response(writer, response)
                     self.log("error", f"Error reading body: {e}")
@@ -196,7 +209,8 @@ class HttpServer:
                 response = HttpResponse(
                     status_code=e.status_code, body=e.message, content_type="text/plain"
                 )
-                self.log("warning", f"[RESPONSE][HTTP-ERROR] {e}")
+                self.log("warning", f"[RESPONSE] {e}")
+                
             except Exception as e:
                 # Handles all other exceptions
                 # TODO: Return exception details only in debug mode
@@ -205,24 +219,21 @@ class HttpServer:
                     body=HTTP_STATUS_CODES[500],
                     content_type="text/plain",
                 )
-                self.log("error", f"[RESPONSE][ERROR] {e}")
+
+                self.log("error", f"[RESPONSE] {e}")
+
+            # Handle keep-alive connections
+            # TODO
+            connection_header = request.headers.get("Connection", "").lower()
+            if connection_header == "close" or (
+                http_version == "HTTP/1.0" and connection_header != "keep-alive"
+            ):
+                response.headers["Connection"] = "close"
+                keep_alive = False
+            else:
+                response.headers["Connection"] = "keep-alive"
 
             await self._send_response(writer=writer, response=response)
-
-            # Handle keep-alive
-            if http_version == "HTTP/1.1":
-                if (
-                    "Connection" in request.headers
-                    and request.headers["Connection"].lower() == "close"
-                ):
-                    break
-            else:
-                # HTTP/1.0 or earlier
-                if (
-                    "Connection" not in request.headers
-                    or request.headers["Connection"].lower() != "keep-alive"
-                ):
-                    break
 
     def _parse_headers(self, headers_data):
         try:
@@ -241,6 +252,7 @@ class HttpServer:
             raise ValueError(f"Invalid headers: {e}")
 
     async def _send_response(self, writer, response):
+        # Recommended to use HttpResponse class for responses
         if not isinstance(response, HttpResponse):
             response = HttpResponse(body=response)
 

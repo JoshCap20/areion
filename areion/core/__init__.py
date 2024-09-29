@@ -26,6 +26,7 @@ __core__ = [
     "HttpResponse",
     "HttpRequest",
     "HttpRequestFactory",
+    "HTTP_STATUS_CODES",
 ]
 
-__all__ = __core__ + __exceptions__ + ["HTTP_STATUS_CODES"]
+__all__ = __core__ + __exceptions__

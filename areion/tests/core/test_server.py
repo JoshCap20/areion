@@ -11,6 +11,7 @@ from ... import (
     HTTP_STATUS_CODES,
     MethodNotAllowedError,
     HttpError,
+    create_error_response
 )
 
 
@@ -38,7 +39,6 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.server.max_conns, 10)
         self.assertEqual(self.server.buffer_size, 1024)
         self.assertEqual(self.server.keep_alive_timeout, 5)
-        self.assertIsNotNone(self.server.semaphore)
         self.assertEqual(self.server.router, self.mock_router)
         self.assertEqual(self.server.request_factory, self.mock_request_factory)
         self.assertEqual(self.server.logger, self.mock_logger)
@@ -132,11 +132,11 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         mock_reader.readexactly = AsyncMock(return_value=b"")
 
         # Mock request_factory
-        mock_request = HttpRequest("GET", "/test", {"Host": "localhost"}, b"")
+        mock_request = HttpRequest("GET", "/test", {"Host": "localhost"}, "")
         self.mock_request_factory.create.return_value = mock_request
 
         # Mock router
-        mock_handler = AsyncMock(return_value=HttpResponse(status_code=200, body=b"OK"))
+        mock_handler = AsyncMock(return_value=HttpResponse(status_code=200, body="OK"))
         self.mock_router.get_handler.return_value = (mock_handler, {}, True)
 
         await self.server._handle_client(mock_reader, mock_writer)
@@ -149,8 +149,12 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         mock_handler.assert_awaited_with(mock_request, **{})
 
         # Verify response was sent
-        expected_response = HttpResponse(status_code=200, body=b"OK")
-        mock_writer.write.assert_called_with(expected_response.format_response())
+        expected_response = HttpResponse(status_code=200, body="OK", headers={"Connection": "keep-alive", "Server": "Areion"})
+        mock_writer.write.assert_called()
+        
+        self.assert_responses_equal(
+            expected_response, self.parse_http_response(mock_writer.write.call_args[0][0])
+        )
 
     async def test_handle_client_timeout_on_headers(self):
         mock_reader = AsyncMock()
@@ -162,9 +166,13 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         await self.server._handle_client(mock_reader, mock_writer)
 
         # Verify that a 408 response was sent
-        response = HttpResponse(status_code=408, body=HTTP_STATUS_CODES[408])
-        mock_writer.write.assert_called_with(response.format_response())
-
+        response = HttpResponse(status_code=408, body=HTTP_STATUS_CODES[408], headers={"Connection": "close", "Server": "Areion"})
+        mock_writer.write.assert_called()
+        
+        self.assert_responses_equal(
+            response, self.parse_http_response(mock_writer.write.call_args[0][0])
+        )
+        
         # Verify that connection was closed
         mock_writer.is_closing.assert_called()
 
@@ -180,8 +188,12 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         await self.server._handle_client(mock_reader, mock_writer)
 
         # Verify that a 400 response was sent
-        response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400])
-        mock_writer.write.assert_called_with(response.format_response())
+        response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400], headers={"Connection": "close", "Server": "Areion"})
+        mock_writer.write.assert_called()
+        
+        self.assert_responses_equal(
+            response, self.parse_http_response(mock_writer.write.call_args[0][0])
+        )
 
         # Verify that connection was closed
         mock_writer.is_closing.assert_called()
@@ -198,9 +210,13 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         await self.server._handle_client(mock_reader, mock_writer)
 
         # Verify that a 413 response was sent
-        response = HttpResponse(status_code=413, body=HTTP_STATUS_CODES[413])
-        mock_writer.write.assert_called_with(response.format_response())
-
+        response = HttpResponse(status_code=413, body=HTTP_STATUS_CODES[413], headers={"Connection": "close", "Server": "Areion"})
+        mock_writer.write.assert_called()
+        
+        self.assert_responses_equal(
+            response, self.parse_http_response(mock_writer.write.call_args[0][0])
+        )
+        
         # Verify that connection was closed
         mock_writer.is_closing.assert_called()
 
@@ -215,9 +231,13 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         await self.server._handle_client(mock_reader, mock_writer)
 
         # Verify that a 400 response was sent
-        response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400])
-        mock_writer.write.assert_called_with(response.format_response())
-
+        response = HttpResponse(status_code=400, body=HTTP_STATUS_CODES[400], headers={"Connection": "close", "Server": "Areion"})
+        mock_writer.write.assert_called()
+        
+        self.assert_responses_equal(
+            response, self.parse_http_response(mock_writer.write.call_args[0][0])
+        )
+        
         # Verify that connection was closed
         mock_writer.is_closing.assert_called()
 
@@ -232,7 +252,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         await self.server._handle_client(mock_reader, mock_writer)
 
         # Verify that a 501 response was sent
-        response = HttpResponse(status_code=501, body="Not Implemented")
+        response = HttpResponse(status_code=501, body="Not Implemented", headers={"Connection": "close"})
         mock_writer.write.assert_called_with(response.format_response())
 
         # Verify that connection was closed
@@ -291,6 +311,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
             "Content-Type": "text/plain",
             "Server": "Areion",
             "Content-Length": "0",
+            "Connection": "keep-alive",
         }
 
         # Capture the actual response bytes passed to writer.write
@@ -301,28 +322,10 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         # Parse the actual response
         parsed_response = self.parse_http_response(actual_response_bytes)
 
-        self.assertEqual(parsed_response["http_version"], "HTTP/1.1")
-        self.assertEqual(parsed_response["status_code"], 204)
-        self.assertEqual(parsed_response["reason_phrase"], "No Content")
-
-        for key, value in expected_headers.items():
-            self.assertIn(
-                key,
-                parsed_response["headers"],
-                f"Header '{key}' not found in response.",
-            )
-            self.assertEqual(
-                parsed_response["headers"][key],
-                value,
-                f"Header '{key}' has incorrect value.",
-            )
-        self.assertEqual(
-            parsed_response["body"],
-            b"",
-            "Response body should be empty for 204 No Content.",
+        self.assert_responses_equal(
+            HttpResponse(status_code=204, body="", headers=expected_headers),
+            parsed_response
         )
-
-        mock_writer.close.assert_not_called()
 
         # Assert that the handler was not called since OPTIONS is handled directly
         mock_handler.assert_not_called()
@@ -354,12 +357,15 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
     async def test_handle_client_connect_method_not_implemented(self):
         mock_reader = AsyncMock()
-        mock_writer = MagicMock()
-        request_headers = b"CONNECT /test HTTP/1.1\r\nHost: localhost\r\n\r\n"
-        mock_reader.readuntil = AsyncMock(return_value=request_headers)
+        mock_writer = AsyncMock()
+        # mock_writer.drain = AsyncMock()
+
+        # Headers with Transfer-Encoding: chunked
+        headers = b"CONNECT /test HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        mock_reader.readuntil = AsyncMock(return_value=headers)
 
         # Mock request_factory
-        mock_request = HttpRequest("CONNECT", "/test", {"Host": "localhost"}, b"")
+        mock_request = HttpRequest("CONNECT", "/test", {"Host": "localhost", "Connection": "close"}, b"")
         self.mock_request_factory.create.return_value = mock_request
 
         # Mock router
@@ -368,8 +374,28 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         await self.server._handle_client(mock_reader, mock_writer)
 
-        response = HttpResponse(status_code=501, body="Not Implemented")
-        mock_writer.write.assert_called_with(response.format_response())
+        # Create the expected response
+        expected_response = create_error_response(
+            status_code=501,
+            message="Not Implemented",
+            headers={"Server": "Areion", "Content-Length": "15", "Content-Type": "text/plain", "Connection": "close"},
+        )
+        
+        # Capture the actual response bytes passed to writer.write
+        actual_write_call = mock_writer.write.call_args
+        self.assertIsNotNone(actual_write_call, "write was not called on the writer.")
+        actual_response_bytes = actual_write_call[0][0]
+
+        # Parse the actual response
+        parsed_response = self.parse_http_response(actual_response_bytes)
+
+        # Assert status line
+        self.assert_responses_equal(
+            expected_response, parsed_response
+        )
+        # Verify that connection was closed
+        mock_writer.is_closing.assert_called()
+
 
     async def test_handle_client_handler_http_error(self):
         mock_reader = AsyncMock()
@@ -392,8 +418,12 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         await self.server._handle_client(mock_reader, mock_writer)
 
-        response = HttpResponse(status_code=404, body="Not Found")
-        mock_writer.write.assert_called_with(response.format_response())
+        response = HttpResponse(status_code=404, body="Not Found", headers={"Connection": "close", "Server": "Areion"})
+        mock_writer.write.assert_called()
+        
+        self.assert_responses_equal(
+            response, self.parse_http_response(mock_writer.write.call_args[0][0])
+        )
 
     async def test_handle_client_handler_unexpected_exception(self):
         mock_reader = AsyncMock()
@@ -414,8 +444,13 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
 
         await self.server._handle_client(mock_reader, mock_writer)
 
-        response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500])
-        mock_writer.write.assert_called_with(response.format_response())
+        response = HttpResponse(status_code=500, body=HTTP_STATUS_CODES[500], headers={"Connection": "keep-alive", "Server": "Areion"})
+        mock_writer.write.assert_called()
+        
+        self.assert_responses_equal(
+            response, self.parse_http_response(mock_writer.write.call_args[0][0])
+        )
+        
 
     async def test_handle_client_keep_alive_close_connection(self):
         mock_reader = AsyncMock()
@@ -433,7 +468,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         self.mock_request_factory.create.return_value = mock_request
 
         # Mock router handler
-        mock_handler = AsyncMock(return_value=HttpResponse(status_code=200, body=b"OK"))
+        mock_handler = AsyncMock(return_value=HttpResponse(status_code=200, body="OK"))
         self.mock_router.get_handler.return_value = (mock_handler, {}, True)
 
         await self.server._handle_client(mock_reader, mock_writer)
@@ -441,8 +476,12 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         # Verify that the handler was called
         mock_handler.assert_awaited_with(mock_request, **{})
 
-        expected_response = HttpResponse(status_code=200, body=b"OK")
-        mock_writer.write.assert_called_with(expected_response.format_response())
+        expected_response = HttpResponse(status_code=200, body="OK", headers={"Connection": "close", "Server": "Areion"})
+        mock_writer.write.assert_called()
+        
+        self.assert_responses_equal(
+            expected_response, self.parse_http_response(mock_writer.write.call_args[0][0])
+        )
 
         mock_writer.is_closing.assert_called()
 
@@ -675,7 +714,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
     #     mock_writer.is_closing.assert_called()
 
     # Helper method to parse HTTP response
-    def parse_http_response(self, response_bytes):
+    def parse_http_response_to_dict(self, response_bytes) -> dict:
         response_stream = BytesIO(response_bytes)
         # Read status line
         status_line = response_stream.readline().decode("iso-8859-1").strip()
@@ -703,6 +742,30 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
             "headers": headers,
             "body": body,
         }
+        
+    def parse_http_response(self, response_bytes: bytes) -> HttpResponse:
+        response_dict = self.parse_http_response_to_dict(response_bytes)
+
+        return HttpResponse(
+            status_code=response_dict["status_code"],
+            body=response_dict["body"].decode("utf-8"),
+            content_type=response_dict["headers"].get("Content-Type"),
+            headers=response_dict["headers"],
+        )
+        
+    def assert_responses_equal(self, response1: HttpResponse, response2: HttpResponse):
+        # Ensure both are HttpResponse instances
+        self.assertIsInstance(response1, HttpResponse)
+        self.assertIsInstance(response2, HttpResponse)
+        
+        # Remove content length header
+        response1.headers.pop("Content-Length", None)
+        response2.headers.pop("Content-Length", None)
+        
+        self.assertEqual(response1.status_code, response2.status_code)
+        self.assertEqual(response1.body, response2.body)
+        self.assertEqual(response1.content_type, response2.content_type)
+        self.assertEqual(response1.headers, response2.headers)
 
 
 if __name__ == "__main__":

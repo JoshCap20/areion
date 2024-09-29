@@ -44,6 +44,9 @@ We designed Areion to have as few dependencies as possible. We created our own H
   - [Router API](#router-api)
   - [HttpRequest and HttpResponse](#httprequest-and-httpresponse)
 - [Exception Handling](#exception-handling)
+- [Best Practices](#best-practices)
+  - [Responses](#responses)
+- [Missing HTTP/1.1 Features](#missing-http11-features)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -72,6 +75,8 @@ These show the results of running the benchmark test for 30 seconds with 12 thre
 ![Average Latency](assets/average_latency.png)
 
 #### Detailed Results
+
+**Results show the performance when keep-alive connections are used (HTTP/1.1 default). Areion still significantly outperforms when the header `Connection: close` is set.**
 
 **Areion**
 
@@ -566,6 +571,37 @@ def get_item(request, item_id):
 ```
 
 _Exceptions in routes and middleware are handled globally and converted to a proper HTTP response._
+
+## Best Practices
+
+### Responses
+
+We recommend returning a `HttpResponse` object directly from route handlers. This allows for more control over the response status code, headers, and body. Additionally, it is recommended, but not required, to pass an explicit `content_type` during construction for performance reasons.
+
+_Make sure that objects are JSON serializable before returning them in the response body._
+
+**Example:**
+
+```python
+from areion import HttpResponse
+
+@router.route("/user", methods=GET)
+def get_user(request):
+    user = {
+        "name": "John Doe",
+        "age": 30
+    }
+    return HttpResponse(body=user, content_type="application/json")
+```
+
+## Missing HTTP/1.1 Features
+
+- **Chunked Transfer Encoding:** Areion does not support chunked transfer encoding yet.
+- **Compression:** Areion does not support compression yet.
+- **Caching:** Areion does not support caching yet.
+- **Cookies:** Areion does not support cookies yet.
+- **Redirects:** Areion does not support redirects yet.
+- **Range Requests:** Areion does not support range requests yet.
 
 ## Contributing
 
