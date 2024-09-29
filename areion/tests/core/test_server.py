@@ -759,8 +759,9 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(response2, HttpResponse)
         
         # Remove content length header
-        response1.headers.pop("Content-Length", None)
-        response2.headers.pop("Content-Length", None)
+        for header in ["Content-Length", "Date"]:
+            response1.headers.pop(header, None)
+            response2.headers.pop(header, None)
         
         self.assertEqual(response1.status_code, response2.status_code)
         self.assertEqual(response1.body, response2.body)

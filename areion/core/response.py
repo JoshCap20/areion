@@ -1,5 +1,5 @@
 import orjson
-
+from .date_header_cache import DateHeaderCache
 
 HTTP_STATUS_CODES: dict[int, str] = {
     100: "Continue",
@@ -161,6 +161,9 @@ class HttpResponse:
         Returns:
             str: The formatted headers.
         """
+        self.headers["Date"] = DateHeaderCache().get_date()
+        self.headers["Server"] = "Areion"
+
         return "".join(f"{key}: {value}\r\n" for key, value in self.headers.items())
 
     def format_response(self) -> bytes:
@@ -171,9 +174,6 @@ class HttpResponse:
             bytes: The formatted HTTP response.
         """
         body = self._format_body()
-        self.headers["Server"] = (
-            "Areion"  # Looks cooler with version in response but security risk
-        )
         self.headers["Content-Length"] = str(len(body))
         response_line = self._get_response_line()
         headers = self._format_headers()
