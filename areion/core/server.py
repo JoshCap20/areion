@@ -76,6 +76,7 @@ class HttpServer:
                     status_code=408,
                     body=HTTP_STATUS_CODES[408],
                     content_type="text/plain",
+                    headers={"Connection": "close"},
                 )
                 await self._send_response(writer, response)
                 break
@@ -84,6 +85,7 @@ class HttpServer:
                     status_code=400,
                     body=HTTP_STATUS_CODES[400],
                     content_type="text/plain",
+                    headers={"Connection": "close"},
                 )
                 await self._send_response(writer, response)
                 break
@@ -92,6 +94,7 @@ class HttpServer:
                     status_code=413,
                     body=HTTP_STATUS_CODES[413],
                     content_type="text/plain",
+                    headers={"Connection": "close"},
                 )
                 await self._send_response(writer, response)
                 break
@@ -108,6 +111,7 @@ class HttpServer:
                     status_code=400,
                     body=HTTP_STATUS_CODES[400],
                     content_type="text/plain",
+                    headers={"Connection": "close"},
                 )
                 await self._send_response(writer, response)
                 self.log("error", f"Error parsing headers: {e}")
@@ -119,7 +123,12 @@ class HttpServer:
             # TODO: Handle Transfer-Encoding
             transfer_encoding = headers.get("Transfer-Encoding", "").lower()
             if "chunked" in transfer_encoding:
-                response = HttpResponse(status_code=501, body="Not Implemented")
+                response = HttpResponse(
+                    status_code=501,
+                    body="Not Implemented",
+                    content_type="text/plain",
+                    headers={"Connection": "close"},
+                )
                 await self._send_response(writer, response)
                 break
 
@@ -136,6 +145,7 @@ class HttpServer:
                         status_code=408,
                         body=HTTP_STATUS_CODES[408],
                         content_type="text/plain",
+                        headers={"Connection": "close"},
                     )
                     await self._send_response(writer, response)
                     break
@@ -144,6 +154,7 @@ class HttpServer:
                         status_code=400,
                         body=HTTP_STATUS_CODES[400],
                         content_type="text/plain",
+                        headers={"Connection": "close"},
                     )
                     await self._send_response(writer, response)
                     self.log("error", f"Error reading body: {e}")

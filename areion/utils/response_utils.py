@@ -96,7 +96,7 @@ def create_empty_response(status_code: int = 204, headers: dict = None) -> HttpR
     return response
 
 
-def create_error_response(status_code: int, message: str = None) -> HttpResponse:
+def create_error_response(status_code: int, message: str = None, headers: dict = None) -> HttpResponse:
     if status_code < 400 or status_code >= 600:
         raise ValueError("Invalid error status code: must be in the 4xx or 5xx range.")
 
@@ -104,5 +104,6 @@ def create_error_response(status_code: int, message: str = None) -> HttpResponse
         status_code=status_code,
         body=message or HTTP_STATUS_CODES[status_code],
         content_type="text/plain",
+        headers=headers,
     )
     return response
