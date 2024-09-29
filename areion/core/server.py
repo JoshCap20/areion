@@ -33,6 +33,7 @@ class HttpServer:
             raise ValueError("Keep alive timeout must be a positive integer.")
 
         self.router = router
+        self.max_conns = max_conns
         self.request_factory = request_factory
         self.host: str = host
         self.port: int = port
@@ -198,6 +199,7 @@ class HttpServer:
                     status_code=e.status_code, body=e.message, content_type="text/plain"
                 )
                 self.log("warning", f"[RESPONSE] {e}")
+                
             except Exception as e:
                 # Handles all other exceptions
                 # TODO: Return exception details only in debug mode
@@ -206,6 +208,7 @@ class HttpServer:
                     body=HTTP_STATUS_CODES[500],
                     content_type="text/plain",
                 )
+
                 self.log("error", f"[RESPONSE] {e}")
 
             # Handle keep-alive connections
