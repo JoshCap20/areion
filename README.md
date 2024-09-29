@@ -43,6 +43,9 @@ We designed Areion to have as few dependencies as possible. We created our own H
   - [AreionServer API](#areionserver-api)
   - [Router API](#router-api)
   - [HttpRequest and HttpResponse](#httprequest-and-httpresponse)
+    - [HttpRequest](#httprequest)
+    - [HttpResponse](#httpresponse)
+    - [Response Utility Functions](#response-utility-functions)
 - [Exception Handling](#exception-handling)
 - [Best Practices](#best-practices)
   - [Responses](#responses)
@@ -244,7 +247,7 @@ server = AreionServerBuilder().with_router(router).with_logger(logger).with_orch
 
 ### Router
 
-The `Router` class manages URL routes and their corresponding handlers.
+The `Router` class manages URL routes and their corresponding handlers. If no methods are defined, it defaults to only accepting GET requests. You can define middleware at the route, route group, or global level.
 
 **Key Features:**
 
@@ -272,6 +275,34 @@ def log_request(handler):
     return wrapper
 
 router.add_global_middleware(log_request)
+```
+
+You can also use a Django-like syntax for defining routes:
+
+```python
+router = DefaultRouter()
+
+def get_user(request, id):
+    return f"User ID: {id}"
+
+router.add_route("/user/:id", get_user, methods=["GET"])
+```
+
+Route with middleware:
+
+```python
+router = DefaultRouter()
+
+def get_user(request, id):
+    return f"User ID: {id}"
+
+def log_request(handler):
+    def wrapper(request, *args, **kwargs):
+        print(f"Received request: {request.path}")
+        return handler(request, *args, **kwargs)
+    return wrapper
+
+router.add_route("/user/:id", get_user, methods=["GET"], middlewares=[log_request])
 ```
 
 ### HttpServer
@@ -510,7 +541,7 @@ Manages URL routes and their handlers.
 
 #### HttpRequest
 
-Represents an HTTP request.
+Represents an HTTP request. These are injected into each route handler as the first argument via the HttpServer.
 
 **Attributes:**
 
@@ -518,16 +549,22 @@ Represents an HTTP request.
 - `path (str)`: Request path.
 - `headers (dict)`: Request headers.
 - `metadata (dict)`: Additional metadata.
+- `body (str)`: Request body.
+- `path (str)`: Request path.
+- `query_params (dict)`: Query parameters.
 
 **Methods:**
 
 - `add_header(key, value)`: Adds a header.
 - `get_header(key)`: Retrieves a header value.
+- `get_body()`: Retrieves the request body.
+- `get_query_param(key)`: Retrieves a query parameter.
 - `add_metadata(key, value)`: Adds metadata.
 - `get_metadata(key)`: Retrieves metadata.
 - `render_template(template_name, context)`: Renders a template.
 - `submit_task(task, *args)`: Submits a task to the orchestrator.
 - `log(message, level)`: Logs a message.
+- `as_dict()`: Converts the request to a dictionary.
 
 #### HttpResponse
 
@@ -543,6 +580,19 @@ Represents an HTTP response.
 **Methods:**
 
 - `format_response()`: Formats the response for sending.
+- `set_header(key, value)`: Sets a header.
+- `set_headers(headers)`: Sets multiple headers.
+- `set_status_code(status_code)`: Sets the status code.
+
+#### Response Utility Functions
+
+- `create_file_response(file_path: str, status_code: int = 200)`: Creates a response for a file given a filepath.
+- `create_json_response(data: dict, status_code: int = 200)`: Creates a JSON response.
+- `create_text_response(text: str, status_code: int = 200)`: Creates a text response.
+- `create_html_response(html: str, status_code: int = 200)`: Creates an HTML response.
+- `create_redirect_response(location: str, status_code: int = 302)`: Creates a redirect response.
+- `create_error_response(status_code: int, message: str = None, headers: dict = None)`: Creates an error response.
+- `create_empty_response(status_code: int = 204, headers: dict = None)`: Creates an empty response.
 
 ## Exception Handling
 
@@ -572,11 +622,14 @@ def get_item(request, item_id):
 
 _Exceptions in routes and middleware are handled globally and converted to a proper HTTP response._
 
+
 ## Best Practices
 
 ### Responses
 
 We recommend returning a `HttpResponse` object directly from route handlers. This allows for more control over the response status code, headers, and body. Additionally, it is recommended, but not required, to pass an explicit `content_type` during construction for performance reasons.
+
+_Helpful wrappers now exist in the `areion/utils/response_utils.py` to make this easier for common use cases._
 
 _Make sure that objects are JSON serializable before returning them in the response body._
 
@@ -600,7 +653,6 @@ def get_user(request):
 - **Compression:** Areion does not support compression yet.
 - **Caching:** Areion does not support caching yet.
 - **Cookies:** Areion does not support cookies yet.
-- **Redirects:** Areion does not support redirects yet.
 - **Range Requests:** Areion does not support range requests yet.
 
 ## Contributing
