@@ -32,16 +32,16 @@ class HttpServer:
         if not isinstance(keep_alive_timeout, int) or keep_alive_timeout <= 0:
             raise ValueError("Keep alive timeout must be a positive integer.")
 
-        self.semaphore = asyncio.Semaphore(max_conns)
         self.router = router
-        self.max_conns = max_conns
         self.request_factory = request_factory
-        self.host = host
-        self.port = port
-        self.buffer_size = buffer_size
-        self.keep_alive_timeout = keep_alive_timeout
+        self.host: str = host
+        self.port: int = port
+        self.buffer_size: int = buffer_size
+        self.max_conns: int = max_conns
+        self.keep_alive_timeout: int = keep_alive_timeout
         self._shutdown_event = asyncio.Event()
         self.logger = logger
+        # self.semaphore = asyncio.Semaphore(max_conns) # TODO: Figure out performance tradeoffs of using semaphore
 
     async def _handle_client(self, reader, writer):
         try:
@@ -62,7 +62,7 @@ class HttpServer:
             self.log("debug", "Connection reset by peer.")
 
     async def _handle_request_logic(self, reader, writer):
-        keep_alive = True
+        keep_alive: bool = True
         # HttpErrors are NOT handled correctly outside of this method
         while keep_alive:
             # Handle request reading
@@ -236,6 +236,7 @@ class HttpServer:
             raise ValueError(f"Invalid headers: {e}")
 
     async def _send_response(self, writer, response):
+        # Recommended to use HttpResponse class for responses
         if not isinstance(response, HttpResponse):
             response = HttpResponse(body=response)
 
