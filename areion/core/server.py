@@ -208,17 +208,19 @@ class HttpServer:
                 )
                 self.log("error", f"[RESPONSE] {e}")
 
-            await self._send_response(writer=writer, response=response)
-            
             # Handle keep-alive connections
             # TODO
             connection_header = request.headers.get("Connection", "").lower()
-            if connection_header == "close" or (http_version == "HTTP/1.0" and connection_header != "keep-alive"):
+            if connection_header == "close" or (
+                http_version == "HTTP/1.0" and connection_header != "keep-alive"
+            ):
                 response.headers["Connection"] = "close"
                 keep_alive = False
             else:
                 response.headers["Connection"] = "keep-alive"
-            
+
+            await self._send_response(writer=writer, response=response)
+
     def _parse_headers(self, headers_data):
         try:
             headers_text = headers_data.decode("iso-8859-1")
