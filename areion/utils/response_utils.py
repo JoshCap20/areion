@@ -1,4 +1,4 @@
-from .response import HttpResponse, HTTP_STATUS_CODES
+from ..core.response import HttpResponse, HTTP_STATUS_CODES
 import mimetypes
 import os
 
