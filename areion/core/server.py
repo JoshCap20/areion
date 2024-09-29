@@ -196,7 +196,7 @@ class HttpServer:
                 response = HttpResponse(
                     status_code=e.status_code, body=e.message, content_type="text/plain"
                 )
-                self.log("warning", f"[RESPONSE][HTTP-ERROR] {e}")
+                self.log("warning", f"[RESPONSE] {e}")
             except Exception as e:
                 # Handles all other exceptions
                 # TODO: Return exception details only in debug mode
@@ -205,24 +205,14 @@ class HttpServer:
                     body=HTTP_STATUS_CODES[500],
                     content_type="text/plain",
                 )
-                self.log("error", f"[RESPONSE][ERROR] {e}")
+                self.log("error", f"[RESPONSE] {e}")
 
             await self._send_response(writer=writer, response=response)
 
-            # Handle keep-alive
-            if http_version == "HTTP/1.1":
-                if (
-                    "Connection" in request.headers
-                    and request.headers["Connection"].lower() == "close"
-                ):
-                    break
-            else:
-                # HTTP/1.0 or earlier
-                if (
-                    "Connection" not in request.headers
-                    or request.headers["Connection"].lower() != "keep-alive"
-                ):
-                    break
+            # Handle keep-alive connections
+            connection_header = request.headers.get("Connection", "").lower()
+            if connection_header == "close" or (http_version == "HTTP/1.0" and connection_header != "keep-alive"):
+                break
 
     def _parse_headers(self, headers_data):
         try:
