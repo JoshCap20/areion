@@ -62,8 +62,9 @@ class HttpServer:
             self.log("debug", "Connection reset by peer.")
 
     async def _handle_request_logic(self, reader, writer):
+        keep_alive = True
         # HttpErrors are NOT handled correctly outside of this method
-        while True:
+        while keep_alive:
             # Handle request reading
             try:
                 headers_data = await asyncio.wait_for(
@@ -208,12 +209,16 @@ class HttpServer:
                 self.log("error", f"[RESPONSE] {e}")
 
             await self._send_response(writer=writer, response=response)
-
+            
             # Handle keep-alive connections
+            # TODO
             connection_header = request.headers.get("Connection", "").lower()
             if connection_header == "close" or (http_version == "HTTP/1.0" and connection_header != "keep-alive"):
-                break
-
+                response.headers["Connection"] = "close"
+                keep_alive = False
+            else:
+                response.headers["Connection"] = "keep-alive"
+            
     def _parse_headers(self, headers_data):
         try:
             headers_text = headers_data.decode("iso-8859-1")
