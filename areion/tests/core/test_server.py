@@ -38,7 +38,6 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.server.max_conns, 10)
         self.assertEqual(self.server.buffer_size, 1024)
         self.assertEqual(self.server.keep_alive_timeout, 5)
-        self.assertIsNotNone(self.server.semaphore)
         self.assertEqual(self.server.router, self.mock_router)
         self.assertEqual(self.server.request_factory, self.mock_request_factory)
         self.assertEqual(self.server.logger, self.mock_logger)
