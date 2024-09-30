@@ -105,6 +105,7 @@ class HttpResponse:
         self.content_type = content_type or self._infer_content_type(body)
 
         self.headers["Content-Type"] = self.content_type
+        self.headers["Server"] = "Areion"
 
     def _infer_content_type(self, body: any) -> str:
         """
@@ -162,7 +163,6 @@ class HttpResponse:
             str: The formatted headers.
         """
         self.headers["Date"] = DateHeaderCache().get_date()
-        self.headers["Server"] = "Areion"
 
         return "".join(f"{key}: {value}\r\n" for key, value in self.headers.items())
 
