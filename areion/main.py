@@ -1,7 +1,9 @@
-import mimetypes
 import os
+import uvloop
 import asyncio
 import threading
+import mimetypes
+
 from .core import HttpServer, HttpRequestFactory, HttpResponse
 
 # Constants
@@ -81,6 +83,8 @@ class AreionServer:
         self.http_server: HttpServer | None = None
         self.request_factory = request_factory
         self.global_middlewares = global_middlewares or []
+
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
     def run(self) -> None:
         """
@@ -212,7 +216,6 @@ class AreionServer:
                 log_method(message)
         else:
             print(f"[{level.upper()}] {message}")
-            
 
 
 class AreionServerBuilder:
