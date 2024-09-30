@@ -84,6 +84,7 @@ class AreionServer:
         self.global_middlewares = global_middlewares or []
         
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        # TODO: Implement _loop handling below
         self._loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
         self._shutdown_event: asyncio.Event = asyncio.Event()
 
