@@ -79,12 +79,15 @@ class AreionServer:
         self.engine: any | None = engine
         self.host: str = host
         self.port: int = port
-        self._shutdown_event: asyncio.Event = asyncio.Event()
         self.http_server: HttpServer | None = None
         self.request_factory = request_factory
         self.global_middlewares = global_middlewares or []
-
+        
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        self._loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
+        self._shutdown_event: asyncio.Event = asyncio.Event()
+
+        
 
     def run(self) -> None:
         """
