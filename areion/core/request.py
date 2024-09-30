@@ -58,7 +58,7 @@ class HttpRequest:
         """
         self.method: str = method
         self.headers: dict = headers
-        self.body: bytes = body
+        self.body: bytes = body or b""
         self.metadata: dict = {}
         self.logger = logger
         self.engine = engine

@@ -4,6 +4,7 @@ import httptools
 from .exceptions import HttpError, MethodNotAllowedError
 from .response import HttpResponse, HTTP_STATUS_CODES
 from .request import HttpRequest
+from .request_builder import RequestBuilder
 
 
 class HttpServer:
@@ -34,7 +35,6 @@ class HttpServer:
             raise ValueError("Keep alive timeout must be a positive integer.")
 
         self.router = router
-        self.max_conns = max_conns
         self.request_factory = request_factory
         self.host: str = host
         self.port: int = port
@@ -43,7 +43,7 @@ class HttpServer:
         self.keep_alive_timeout: int = keep_alive_timeout
         self._shutdown_event = asyncio.Event()
         self.logger = logger
-        self.parser = httptools.HttpRequestParser(self)
+        self.request_builder = RequestBuilder(self.request_factory)
         # self.semaphore = asyncio.Semaphore(max_conns) # TODO: Figure out performance tradeoffs of using semaphore
 
     async def _handle_client(self, reader, writer):
@@ -55,14 +55,6 @@ class HttpServer:
             if not writer.is_closing():
                 writer.close()
                 await writer.wait_closed()
-
-    async def _process_request(self, reader, writer):
-        try:
-            await self._handle_request_logic(reader, writer)
-        except asyncio.CancelledError:
-            self.log("debug", "Client connection cancelled.")
-        except ConnectionResetError:
-            self.log("debug", "Connection reset by peer.")
             
     """
     For `httptools` integration, this class needs the following callback methods (all optional):
@@ -77,28 +69,43 @@ class HttpServer:
           - on_status(status: bytes)
     """
 
-    async def _handle_request_logic(self, reader, writer):
+    async def _process_request(self, reader, writer):
         keep_alive: bool = True
         # HttpErrors are NOT handled correctly outside of this method
         while keep_alive:
             # Handle request reading
             try:
-                headers_data = await asyncio.wait_for(
-                    reader.readuntil(b"\r\n\r\n"), timeout=self.keep_alive_timeout
+                data = await asyncio.wait_for(
+                    reader.read(self.buffer_size), timeout=self.keep_alive_timeout
                 )
+                if not data:
+                    break
+                
+                print(data)
+                
+                self.request_builder.feed_data(data)
+                
+                if self.request_builder.parser.is_message_complete():
+                    request = self.request_builder.get_request()
+                    print(request)
+                    response = await self._handle_http_request(request)
+                    
+                    connection_header = request.headers.get("connection", "").lower()
+                    if connection_header == "close" or (
+                        request.http_version == "HTTP/1.0" and connection_header != "keep-alive"
+                    ):
+                        keep_alive = False
+                        response.headers["Connection"] = "close"
+                    else:
+                        response.headers["Connection"] = "keep-alive"
+                    await self._send_response(writer, response)
+
+                    self.request_builder.reset()
+                    
             except asyncio.TimeoutError:
                 response = HttpResponse(
                     status_code=408,
                     body=HTTP_STATUS_CODES[408],
-                    content_type="text/plain",
-                    headers={"Connection": "close"},
-                )
-                await self._send_response(writer, response)
-                break
-            except asyncio.IncompleteReadError:
-                response = HttpResponse(
-                    status_code=400,
-                    body=HTTP_STATUS_CODES[400],
                     content_type="text/plain",
                     headers={"Connection": "close"},
                 )
@@ -114,165 +121,71 @@ class HttpServer:
                 await self._send_response(writer, response)
                 break
 
-            if not headers_data:
-                break
-
-            try:
-                # TODO: Handle http_versions and keep alive better
-                request_line, headers = self._parse_headers(headers_data)
-                method, path, http_version = request_line
-            except Exception as e:
-                response = HttpResponse(
-                    status_code=400,
-                    body=HTTP_STATUS_CODES[400],
-                    content_type="text/plain",
-                    headers={"Connection": "close"},
-                )
-                await self._send_response(writer, response)
-                self.log("error", f"Error parsing headers: {e}")
-                break
-
-            # TODO: Break this into specific HTTP version handling
-            # TODO: Ensure proper host header
-
-            # TODO: Handle Transfer-Encoding
-            transfer_encoding = headers.get("Transfer-Encoding", "").lower()
-            if "chunked" in transfer_encoding:
-                response = HttpResponse(
-                    status_code=501,
-                    body="Not Implemented",
-                    content_type="text/plain",
-                    headers={"Connection": "close"},
-                )
-                await self._send_response(writer, response)
-                break
-
-            content_length = int(headers.get("Content-Length", 0))
-            body = b""
-            if content_length > 0:
-                try:
-                    body = await asyncio.wait_for(
-                        reader.readexactly(content_length),
-                        timeout=self.keep_alive_timeout,
-                    )
-                except asyncio.TimeoutError:
-                    response = HttpResponse(
-                        status_code=408,
-                        body=HTTP_STATUS_CODES[408],
-                        content_type="text/plain",
-                        headers={"Connection": "close"},
-                    )
-                    await self._send_response(writer, response)
-                    break
-                except Exception as e:
-                    response = HttpResponse(
-                        status_code=400,
-                        body=HTTP_STATUS_CODES[400],
-                        content_type="text/plain",
-                        headers={"Connection": "close"},
-                    )
-                    await self._send_response(writer, response)
-                    self.log("error", f"Error reading body: {e}")
-                    break
-
-            try:
-                request: HttpRequest = self.request_factory.create(
-                    method, path, headers, body
-                )
-                # self.log("info", f"[REQUEST] {request}")
-                try:
-                    handler, path_params, is_async = self.router.get_handler(
-                        method, path
-                    )
-                except MethodNotAllowedError:
-                    if hasattr(self.router, "get_allowed_methods"):
-                        allowed_methods = self.router.get_allowed_methods(path)
-                    else:
-                        allowed_methods = []
-                    response = HttpResponse(
-                        status_code=405,
-                        body=HTTP_STATUS_CODES[405],
-                        content_type="text/plain",
-                        headers={"Allow": ", ".join(allowed_methods)},
-                    )
-                    await self._send_response(writer, response)
-                    break
-
-                # Handle OPTIONS and HEAD requests
-                if method == "OPTIONS":
-                    response = HttpResponse(status_code=204, body="")
-                    response.set_header(
-                        "Allow", ", ".join(self.router.get_allowed_methods(path))
-                    )
-                elif method == "HEAD":
-                    response = await handler(request, **path_params)
-                    response.body = b""
-                elif request.method == "CONNECT":
-                    response = HttpResponse(
-                        status_code=501,
-                        body=HTTP_STATUS_CODES[501],
-                        content_type="text/plain",
-                    )
-                else:
-                    if is_async:
-                        response = await handler(request, **path_params)
-                    else:
-                        response = handler(request, **path_params)
-
-            except HttpError as e:
-                # Handles web exceptions raised by route handler
-                response = HttpResponse(
-                    status_code=e.status_code, body=e.message, content_type="text/plain"
-                )
-                self.log("warning", f"[RESPONSE] {e}")
-                
-            except Exception as e:
-                # Handles all other exceptions
-                # TODO: Return exception details only in debug mode
-                response = HttpResponse(
-                    status_code=500,
-                    body=HTTP_STATUS_CODES[500],
-                    content_type="text/plain",
-                )
-
-                self.log("error", f"[RESPONSE] {e}")
-
-            # Handle keep-alive connections
-            # TODO
-            connection_header = request.headers.get("Connection", "").lower()
-            if connection_header == "close" or (
-                http_version == "HTTP/1.0" and connection_header != "keep-alive"
-            ):
-                response.headers["Connection"] = "close"
-                keep_alive = False
-            else:
-                response.headers["Connection"] = "keep-alive"
-
-            await self._send_response(writer=writer, response=response)
-
-    def _parse_headers(self, headers_data):
+    async def _handle_http_request(self, request: HttpRequest) -> HttpResponse:
         try:
-            headers_text = headers_data.decode("iso-8859-1")
-            header_lines = headers_text.split("\r\n")
-            request_line = header_lines[0]
-            method, path, http_version = request_line.strip().split(" ", 2)
-            headers = {}
-            for line in header_lines[1:]:
-                if line == "":
-                    continue
-                key, value = line.split(":", 1)
-                headers[key.strip()] = value.strip()
-            return (method, path, http_version), headers
+            handler, path_params, is_async = self.router.get_handler(request.method, request.path)
+        except MethodNotAllowedError:
+            allowed_methods = self.router.get_allowed_methods(request.path)
+            return HttpResponse(
+                status_code=405,
+                body=HTTP_STATUS_CODES[405],
+                content_type="text/plain",
+                headers={"Allow": ", ".join(allowed_methods)},
+            )
         except Exception as e:
-            raise ValueError(f"Invalid headers: {e}")
+            self.log("error", f"Routing error: {e}")
+            return HttpResponse(
+                status_code=500,
+                body=HTTP_STATUS_CODES[500],
+                content_type="text/plain",
+            )
+
+        # Handle OPTIONS and HEAD requests
+        if request.method == "OPTIONS":
+            return HttpResponse(
+                status_code=204,
+                body="",
+                content_type="text/plain",
+                headers={"Allow": ", ".join(self.router.get_allowed_methods(request.path))},
+            )
+        elif request.method == "HEAD":
+            response = await self._execute_handler(handler, request, path_params, is_async)
+            response.body = b""  # Empty body for HEAD requests
+            return response
+        elif request.method == "CONNECT":
+            return HttpResponse(
+                status_code=501,
+                body=HTTP_STATUS_CODES[501],
+                content_type="text/plain",
+            )
+        else:
+            return await self._execute_handler(handler, request, path_params, is_async)
+
+    async def _execute_handler(self, handler, request, path_params, is_async):
+        try:
+            if is_async:
+                response = await handler(request, **path_params)
+            else:
+                loop = asyncio.get_running_loop()
+                response = await loop.run_in_executor(None, handler, request, **path_params)
+            if not isinstance(response, HttpResponse):
+                response = HttpResponse(body=response)
+            return response
+        except HttpError as e:
+            return HttpResponse(
+                status_code=e.status_code,
+                body=e.message,
+                content_type="text/plain",
+            )
+        except Exception as e:
+            return HttpResponse(
+                status_code=500,
+                body=HTTP_STATUS_CODES[500],
+                content_type="text/plain",
+            )
 
     async def _send_response(self, writer, response):
-        # Recommended to use HttpResponse class for responses
-        if not isinstance(response, HttpResponse):
-            response = HttpResponse(body=response)
-
         # TODO: Add interceptor component here
-
         buffer = response.format_response()
         writer.write(buffer)
         await writer.drain()
@@ -286,9 +199,7 @@ class HttpServer:
             await self._shutdown_event.wait()
 
     async def stop(self):
-        if self._server:
-            self._server.close()
-            await self._server.wait_closed()
+        self._shutdown_event.set()
 
     async def run(self, *args, **kwargs):
         try:
