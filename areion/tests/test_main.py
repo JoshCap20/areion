@@ -193,9 +193,9 @@ class TestAreionServer(unittest.TestCase):
         self.logger.info.assert_any_call("Orchestrator shutdown complete.")
 
     def test_stop(self):
-        self.server.loop.call_soon_threadsafe = Mock()
+        self.server._loop.call_soon_threadsafe = Mock()
         self.server.stop()
-        self.server.loop.call_soon_threadsafe.assert_called_once_with(
+        self.server._loop.call_soon_threadsafe.assert_called_once_with(
             self.server._shutdown_event.set
         )
 

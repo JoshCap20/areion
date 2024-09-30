@@ -105,6 +105,7 @@ class HttpResponse:
         self.content_type = content_type or self._infer_content_type(body)
 
         self.headers["Content-Type"] = self.content_type
+        self.headers["Server"] = "Areion"
 
     def _infer_content_type(self, body: any) -> str:
         """
@@ -126,15 +127,13 @@ class HttpResponse:
             bytes: The formatted body.
         """
         body_type = type(self.body)
-
-        body_type_map = {
-            str: lambda body: body.encode("utf-8"),
-            dict: lambda body: orjson.dumps(body),
-            bytes: lambda body: body,
-        }
-
-        formatter = body_type_map.get(body_type, lambda body: str(body).encode("utf-8"))
-        return formatter(self.body)
+        if body_type == dict:
+            return orjson.dumps(self.body)
+        elif body_type == bytes:
+            return self.body
+        elif body_type == str:
+            return self.body.encode("utf-8")
+        return str(self.body).encode("utf-8")
 
     def _get_status_phrase(self) -> str:
         """
@@ -154,18 +153,6 @@ class HttpResponse:
         """
         return f"HTTP/1.1 {self.status_code} {self._get_status_phrase()}\r\n"
 
-    def _format_headers(self) -> str:
-        """
-        Format the headers for the HTTP response.
-
-        Returns:
-            str: The formatted headers.
-        """
-        self.headers["Date"] = DateHeaderCache().get_date()
-        self.headers["Server"] = "Areion"
-
-        return "".join(f"{key}: {value}\r\n" for key, value in self.headers.items())
-
     def format_response(self) -> bytes:
         """
         Format the HTTP response, including headers and body.
@@ -173,12 +160,19 @@ class HttpResponse:
         Returns:
             bytes: The formatted HTTP response.
         """
+        # Format body
         body = self._format_body()
-        self.headers["Content-Length"] = str(len(body))
-        response_line = self._get_response_line()
-        headers = self._format_headers()
+        content_length = len(body)
 
-        return (response_line + headers + "\r\n").encode("utf-8") + body
+        # Set headers
+        self.headers["Content-Length"] = str(content_length)
+        self.headers["Date"] = DateHeaderCache().get_date()
+
+        # Construct response
+        response_line = f"HTTP/1.1 {self.status_code} {HTTP_STATUS_CODES.get(self.status_code, '')}\r\n".encode('utf-8')
+        headers = b"".join(f"{key}: {value}\r\n".encode('utf-8') for key, value in self.headers.items())
+
+        return response_line + headers + b"\r\n" + body
 
     def set_header(self, key: str, value: any) -> None:
         """

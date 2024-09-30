@@ -1,4 +1,5 @@
 import asyncio
+import httptools
 
 from .exceptions import HttpError, MethodNotAllowedError
 from .response import HttpResponse, HTTP_STATUS_CODES
@@ -42,6 +43,7 @@ class HttpServer:
         self.keep_alive_timeout: int = keep_alive_timeout
         self._shutdown_event = asyncio.Event()
         self.logger = logger
+        self.parser = httptools.HttpRequestParser(self)
         # self.semaphore = asyncio.Semaphore(max_conns) # TODO: Figure out performance tradeoffs of using semaphore
 
     async def _handle_client(self, reader, writer):
@@ -61,6 +63,19 @@ class HttpServer:
             self.log("debug", "Client connection cancelled.")
         except ConnectionResetError:
             self.log("debug", "Connection reset by peer.")
+            
+    """
+    For `httptools` integration, this class needs the following callback methods (all optional):
+          - on_message_begin()
+          - on_url(url: bytes)
+          - on_header(name: bytes, value: bytes)
+          - on_headers_complete()
+          - on_body(body: bytes)
+          - on_message_complete()
+          - on_chunk_header()
+          - on_chunk_complete()
+          - on_status(status: bytes)
+    """
 
     async def _handle_request_logic(self, reader, writer):
         keep_alive: bool = True

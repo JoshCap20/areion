@@ -1,7 +1,9 @@
-import mimetypes
 import os
+import uvloop
 import asyncio
 import threading
+import mimetypes
+
 from .core import HttpServer, HttpRequestFactory, HttpResponse
 
 # Constants
@@ -77,11 +79,16 @@ class AreionServer:
         self.engine: any | None = engine
         self.host: str = host
         self.port: int = port
-        self.loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
-        self._shutdown_event: asyncio.Event = asyncio.Event()
         self.http_server: HttpServer | None = None
         self.request_factory = request_factory
         self.global_middlewares = global_middlewares or []
+        
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        # TODO: Implement _loop handling below
+        self._loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
+        self._shutdown_event: asyncio.Event = asyncio.Event()
+
+        
 
     def run(self) -> None:
         """
@@ -114,7 +121,7 @@ class AreionServer:
 
         print(AREION_LOGO)
 
-        self.logger.info(f"Starting server on {self.host}:{self.port}")
+        self.log("info", f"Starting server on {self.host}:{self.port}")
 
         self._start_orchestrator_in_thread()
 
@@ -156,16 +163,17 @@ class AreionServer:
                 await asyncio.get_event_loop().run_in_executor(
                     None, self.orchestrator.shutdown
                 )
-                self.logger.info("Orchestrator shutdown complete.")
+                self.log("info", "Orchestrator shutdown complete.")
             except Exception as e:
-                self.logger.error(f"Error during orchestrator shutdown: {e}")
+                self.log("error", f"Orchestrator shutdown error: {e}")
 
     def stop(self):
         """
         Initiate server shutdown.
         """
         self.logger.info("Shutdown initiated.")
-        self.loop.call_soon_threadsafe(self._shutdown_event.set)
+        self._loop.call_soon_threadsafe(self._shutdown_event.set)
+
 
     def _start_orchestrator_in_thread(self):
         """
@@ -182,7 +190,7 @@ class AreionServer:
             try:
                 self.orchestrator.start()
             except Exception as e:
-                self.logger.error(f"Orchestrator error: {e}")
+                self.log("error", f"Orchestrator start error: {e}")
 
     async def _static_file_handler(self, request, filename):
         """
@@ -202,6 +210,17 @@ class AreionServer:
         return HttpResponse(
             status_code=200, body=content, headers={"Content-Type": mime_type}
         )
+
+    def log(self, level: str, message: str) -> None:
+        """
+        Log a message using the server's logger.
+        """
+        if self.logger:
+            log_method = getattr(self.logger, level, None)
+            if log_method:
+                log_method(message)
+        else:
+            print(f"[{level.upper()}] {message}")
 
 
 class AreionServerBuilder:
