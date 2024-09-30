@@ -37,6 +37,7 @@ dependencies = [
     "apscheduler>=3.0.0",
     "orjson>=3.0.0",
     "uvloop>=0.20.0",
+    "httptools>=0.6.1",
 ]
 
 [project.urls]
