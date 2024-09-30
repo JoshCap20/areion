@@ -1,10 +1,9 @@
 # Areion Server
 
-
 [![License][license-shield]][license-url] [![Downloads](https://static.pepy.tech/badge/areion)](https://pepy.tech/project/areion)
 [![Downloads](https://static.pepy.tech/badge/areion/month)](https://pepy.tech/project/areion)
 
-[![PyPi][pypi-shield]][pypi-url] [![PyPi][pypiversion-shield]][pypi-url] 
+[![PyPi][pypi-shield]][pypi-url] [![PyPi][pypiversion-shield]][pypi-url]
 
 Welcome to the Areion HTTP Server documentation. Areion is a lightweight, asynchronous HTTP server written in Python, designed for simplicity and extensibility. This documentation provides a comprehensive guide to using Areion, covering everything from getting started to advanced usage and component details.
 
@@ -28,6 +27,7 @@ We designed Areion to have as few dependencies as possible. We created our own H
     - [Socket Errors](#socket-errors)
 - [Getting Started](#getting-started)
   - [Installation](#installation)
+  - [Developing](#developing)
   - [Quick Start Guide](#quick-start-guide)
   - [Development Tools](#development-tools)
 - [Core Components](#core-components)
@@ -169,6 +169,28 @@ Areion can be installed via pip:
 
 ```bash
 pip install areion
+```
+
+### Developing
+
+To get started developing this project, follow these steps:
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/JoshCap20/areion.git
+```
+
+2. Install the dependencies (preferably in a virtual environment):
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Run the tests:
+
+```bash
+pytest
 ```
 
 ### Quick Start Guide
@@ -625,7 +647,6 @@ def get_item(request, item_id):
 ```
 
 _Exceptions in routes and middleware are handled globally and converted to a proper HTTP response._
-
 
 ## Best Practices
 
