@@ -19,8 +19,8 @@ class TestRequestBuilder(unittest.TestCase):
         self.assertEqual(self.request_builder.headers['content-type'], 'application/json')
 
     def test_on_headers_complete(self):
-        self.request_builder.parser.get_method = Mock(return_value=httptools.HTTP_GET)
-        self.request_builder.parser.get_http_version = Mock(return_value=11)
+        self.request_builder.parser.get_method = Mock(return_value="GET")
+        self.request_builder.parser.get_http_version = Mock(return_value="HTTP/1.1")
         self.request_builder.on_headers_complete()
         self.assertEqual(self.request_builder.method, 'GET')
         self.assertEqual(self.request_builder.http_version, 'HTTP/1.1')
@@ -55,9 +55,11 @@ class TestRequestBuilder(unittest.TestCase):
         data = b'GET /test HTTP/1.1\r\nHost: example.com\r\n\r\n'
         self.request_builder.parser.is_message_complete = Mock(return_value=True)
         self.request_builder.get_request = Mock(return_value='request_object')
+        self.request_builder._handle_http_request = Mock(return_value='response_object')
         self.request_builder.feed_data(data)
         self.request_builder.get_request.assert_called_once()
-        self.assertEqual(self.request_builder.get_request(), 'request_object')
+        self.request_builder._handle_http_request.assert_called_once_with('request_object')
+        
 
     def test_feed_data_with_error(self):
         data = b'INVALID DATA'

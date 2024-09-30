@@ -52,6 +52,7 @@ class HttpRequest:
         logger=None,
         engine=None,
         orchestrator=None,
+        http_version=None,
     ):
         """
         Don't call this directly. Use HttpRequestFactory instead.
@@ -63,6 +64,7 @@ class HttpRequest:
         self.logger = logger
         self.engine = engine
         self.orchestrator = orchestrator
+        self.http_version = http_version
 
         parsed_url = urlparse(path)
         self.path = parsed_url.path
@@ -214,7 +216,7 @@ class HttpRequestFactory:
         self.engine = engine
         self.orchestrator = orchestrator
 
-    def create(self, method, path, headers, body=None):
+    def create(self, method, path, headers, body=None, http_version=None):
         """
         Creates an HttpRequest with injected logger, engine, and orchestrator.
         """
@@ -226,4 +228,5 @@ class HttpRequestFactory:
             engine=self.engine,
             orchestrator=self.orchestrator,
             body=body,
+            http_version=http_version
         )

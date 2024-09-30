@@ -9,51 +9,47 @@ class RequestBuilder:
         self.reset()
 
     def reset(self):
+        self.is_message_complete = False
         self.method = None
         self.path = None
         self.http_version = None
         self.headers = {}
         self.body = bytearray()
         self.parser = httptools.HttpRequestParser(self)
-        print("RequestBuilder reset.")
 
     def on_message_begin(self):
-        print("RequestBuilder on_message_begin.")
+        pass
 
     def on_url(self, url: bytes):
         self.path = url.decode('utf-8')
-        print(f"RequestBuilder on_url: {self.path}")
 
     def on_header(self, name: bytes, value: bytes):
         self.headers[name.decode('utf-8').lower()] = value.decode('utf-8')
-        print(f"RequestBuilder on_header: {name.decode('utf-8').lower()}={value.decode('utf-8')}")
+
     def on_headers_complete(self):
-        self.method = httptools.http_method_str(self.parser.get_method()).decode('utf-8')
-        self.http_version = f"HTTP/{self.parser.get_http_version() // 10}.{self.parser.get_http_version() % 10}"
-        print(f"RequestBuilder on_headers_complete: {self.method} {self.http_version}")
+        self.method = self.parser.get_method()
+        self.http_version = self.parser.get_http_version()
+    
     def on_body(self, body: bytes):
         self.body.extend(body)
-        print(f"RequestBuilder on_body: {body}")
+    
     def on_message_complete(self):
-        print("RequestBuilder on_message_complete.")
         try:
+            self.is_message_complete = True
             self.request = self.request_factory.create(
                 method=self.method,
                 path=self.path,
                 headers=self.headers,
-                body=bytes(self.body)
+                body=bytes(self.body),
+                http_version=self.http_version
             )
-            print(f"RequestBuilder on_message_complete: {self.request}")
         except Exception as e:
-            print(f"RequestBuilder on_message_complete: {e}")
             raise HttpError(status_code=400, message=HTTP_STATUS_CODES[400] + str(e)) from e
 
     def feed_data(self, data):
         try:
             self.parser.feed_data(data)
-            print(f"RequestBuilder feed_data: {data}")
         except httptools.HttpParserError as e:
-            print (f"RequestBuilder feed_data: {e}")
             raise HttpError(status_code=400, message=HTTP_STATUS_CODES[400] + str(e)) from e
 
     def get_request(self):

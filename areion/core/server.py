@@ -49,6 +49,8 @@ class HttpServer:
     async def _handle_client(self, reader, writer):
         try:
             await self._process_request(reader, writer)
+        except ConnectionError:
+            pass
         except Exception as e:
             self.log("error", f"{e}")
         finally:
@@ -81,13 +83,10 @@ class HttpServer:
                 if not data:
                     break
                 
-                print(data)
-                
                 self.request_builder.feed_data(data)
                 
-                if self.request_builder.parser.is_message_complete():
+                if self.request_builder.is_message_complete:
                     request = self.request_builder.get_request()
-                    print(request)
                     response = await self._handle_http_request(request)
                     
                     connection_header = request.headers.get("connection", "").lower()
