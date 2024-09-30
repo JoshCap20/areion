@@ -172,7 +172,8 @@ class AreionServer:
         Initiate server shutdown.
         """
         self.logger.info("Shutdown initiated.")
-        self._shutdown_event.set()
+        self._loop.call_soon_threadsafe(self._shutdown_event.set)
+
 
     def _start_orchestrator_in_thread(self):
         """
