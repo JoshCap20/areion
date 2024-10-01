@@ -164,15 +164,22 @@ class HttpResponse:
         body = self._format_body()
         content_length = len(body)
 
-        # Set headers
         self.headers["Content-Length"] = str(content_length)
         self.headers["Date"] = DateHeaderCache().get_date()
 
-        # Construct response
-        response_line = f"HTTP/1.1 {self.status_code} {HTTP_STATUS_CODES.get(self.status_code, '')}\r\n".encode('utf-8')
-        headers = b"".join(f"{key}: {value}\r\n".encode('utf-8') for key, value in self.headers.items())
+        response_parts = [
+            f"HTTP/1.1 {self.status_code} {HTTP_STATUS_CODES.get(self.status_code, '')}\r\n".encode('utf-8')
+        ]
 
-        return response_line + headers + b"\r\n" + body
+        for key, value in self.headers.items():
+            response_parts.append(f"{key}: {value}\r\n".encode('utf-8'))
+
+        response_parts.append(b"\r\n")
+        response_parts.append(body)
+
+        return b"".join(response_parts)
+    
+    
 
     def set_header(self, key: str, value: any) -> None:
         """

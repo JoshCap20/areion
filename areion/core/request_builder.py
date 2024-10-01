@@ -27,7 +27,7 @@ class RequestBuilder:
         self.headers[name.decode('utf-8').lower()] = value.decode('utf-8')
 
     def on_headers_complete(self):
-        self.method = self.parser.get_method()
+        self.method = self.parser.get_method().decode('utf-8')
         self.http_version = self.parser.get_http_version()
     
     def on_body(self, body: bytes):
@@ -40,7 +40,7 @@ class RequestBuilder:
                 method=self.method,
                 path=self.path,
                 headers=self.headers,
-                body=bytes(self.body),
+                body=self.body,
                 http_version=self.http_version
             )
         except Exception as e:

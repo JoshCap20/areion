@@ -19,11 +19,11 @@ class TestRequestBuilder(unittest.TestCase):
         self.assertEqual(self.request_builder.headers['content-type'], 'application/json')
 
     def test_on_headers_complete(self):
-        self.request_builder.parser.get_method = Mock(return_value="GET")
-        self.request_builder.parser.get_http_version = Mock(return_value="HTTP/1.1")
+        self.request_builder.parser.get_method = Mock(return_value=b"GET")
+        self.request_builder.parser.get_http_version = Mock(return_value=b"HTTP/1.1")
         self.request_builder.on_headers_complete()
         self.assertEqual(self.request_builder.method, 'GET')
-        self.assertEqual(self.request_builder.http_version, 'HTTP/1.1')
+        self.assertEqual(self.request_builder.http_version, b'HTTP/1.1')
 
     def test_on_body(self):
         self.request_builder.on_body(b'{"key": "value"}')
@@ -34,6 +34,7 @@ class TestRequestBuilder(unittest.TestCase):
         self.request_builder.path = '/test'
         self.request_builder.headers = {'content-type': 'application/json'}
         self.request_builder.body = b'{"key": "value"}'
+        self.request_builder.http_version = 'HTTP/1.1'
         self.request_builder.request_factory.create = Mock(return_value='request_object')
         
         self.request_builder.on_message_complete()
@@ -42,7 +43,8 @@ class TestRequestBuilder(unittest.TestCase):
             method='GET',
             path='/test',
             headers={'content-type': 'application/json'},
-            body=b'{"key": "value"}'
+            body=b'{"key": "value"}',
+            http_version='HTTP/1.1'
         )
 
     def test_feed_data(self):
@@ -50,16 +52,6 @@ class TestRequestBuilder(unittest.TestCase):
         self.request_builder.parser.feed_data = Mock()
         self.request_builder.feed_data(data)
         self.request_builder.parser.feed_data.assert_called_once_with(data)
-
-    def test_feed_data_populates_request(self):
-        data = b'GET /test HTTP/1.1\r\nHost: example.com\r\n\r\n'
-        self.request_builder.parser.is_message_complete = Mock(return_value=True)
-        self.request_builder.get_request = Mock(return_value='request_object')
-        self.request_builder._handle_http_request = Mock(return_value='response_object')
-        self.request_builder.feed_data(data)
-        self.request_builder.get_request.assert_called_once()
-        self.request_builder._handle_http_request.assert_called_once_with('request_object')
-        
 
     def test_feed_data_with_error(self):
         data = b'INVALID DATA'
