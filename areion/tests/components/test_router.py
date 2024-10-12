@@ -86,6 +86,7 @@ class TestRouter(unittest.TestCase):
         group = self.router.group("/api")
 
         group.add_route("/user", handler)
+        self.router.include_router(group)
         route_handler, path_params, _ = self.router.get_handler("GET", "/api/user")
         self.assertEqual(route_handler, handler)
         self.assertEqual(path_params, {})
@@ -97,6 +98,7 @@ class TestRouter(unittest.TestCase):
         group = self.router.group("/api", middlewares=[group_middleware])
 
         group.add_route("/user", handler)
+        self.router.include_router(group)
         route_handler, path_params, _ = self.router.get_handler("GET", "/api/user")
         route_handler("request")
         group_middleware.assert_called_once_with(handler)
