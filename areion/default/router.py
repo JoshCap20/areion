@@ -10,36 +10,9 @@ class Router:
     handlers based on HTTP methods and paths. It supports both static and dynamic
     path segments and allows for the application of middlewares at both global and
     route-specific levels.
-
-    Attributes:
-        root (TrieNode): The root node of the routing trie.
-        allowed_methods (list): List of allowed HTTP methods.
-        middlewares (dict): Dictionary to store middlewares.
-        global_middlewares (list): List of global middlewares applied to all routes.
-        route_info (list): List of route information for debugging or documentation.
-        logger (logging.Logger or None): Logger instance for logging messages.
-
-    Methods:
-        add_route(path, handler, methods=["GET"], middlewares=None):
-            Adds a route to the router with optional middlewares.
-
-        group(base_path, middlewares=None) -> "Router":
-            Creates a sub-router with a base path and optional group-specific middlewares.
-
-        route(path, methods=["GET"], middlewares=[]):
-            A decorator to define a route with optional middlewares.
-
-        get_handler(method, path):
-            Retrieve the handler for a given HTTP method and path.
-
-        add_global_middleware(middleware) -> None:
-            Adds a middleware that will be applied globally to all routes.
-
-        log(level: str, message: str) -> None:
-            Logs a message with the specified log level.
     """
 
-    def __init__(self):
+    def __init__(self, prefix: str = ""):
         self.root = TrieNode()
         self.allowed_methods = [
             "GET",
@@ -51,6 +24,7 @@ class Router:
             "OPTIONS",
         ]
         self.middlewares = {}
+        self.prefix = prefix.rstrip("/")
         self.global_middlewares = []
         self.route_info = []
         self.logger = None
@@ -81,6 +55,8 @@ class Router:
 
             router.add_route("/hello", my_handler, methods=["GET"])
         """
+        full_path = f"{self.prefix}{path}".rstrip("/")
+
         # Does not hurt perfomance since performed at startup
         if self.strict_http and not all(
             method in self.allowed_methods for method in methods
@@ -123,7 +99,7 @@ class Router:
             # For generating openapi documentation
             self.route_info.append(
                 {
-                    "path": path,
+                    "path": full_path,
                     "method": method,
                     "handler": handler,
                     "middlewares": middlewares,
@@ -131,9 +107,24 @@ class Router:
                 }
             )
 
+    def include_router(self, router: "Router") -> None:
+        """
+        Includes all routes from the given sub-router into the current router.
+
+        Args:
+            router (Router): Another Router instance to include its routes.
+        """
+        for route in router.route_info:
+            self.add_route(
+                path=route["path"],
+                handler=route["handler"],
+                methods=[route["method"]],
+                middlewares=route["middlewares"],
+            )
+
     def group(self, base_path: str, middlewares: list[callable] = None) -> "Router":
         """
-        Creates a sub-router (group) with a base path and optional group-specific middlewares.
+        Creates a sub-router with a base path and optional group-specific middlewares.
 
         Args:
             base_path (str): The base path for the sub-router.
@@ -142,18 +133,9 @@ class Router:
         Returns:
             Router: A sub-router instance with the specified base path.
         """
-        sub_router = Router()
-        group_middlewares: list = middlewares or []
-
-        def add_sub_route(sub_path, handler, methods=["GET"], middlewares=None):
-            full_path = f"{base_path.rstrip('/')}/{sub_path.lstrip('/')}"
-            combined_middlewares = (middlewares or []) + (group_middlewares or [])
-            self.add_route(
-                full_path, handler, methods, middlewares=combined_middlewares
-            )
-
-        sub_router.add_route = add_sub_route
-        return sub_router
+        router = Router(prefix=f"{self.prefix}/{base_path}")
+        router.global_middlewares = self.global_middlewares + (middlewares or [])
+        return router
 
     def route(
         self, path: str, methods: list[str] = ["GET"], middlewares: list[callable] = []
@@ -269,27 +251,16 @@ class Router:
         """
         Checks if a route exists in the router.
         """
-
-        def _check_if_method_exists(path: str, method: str) -> bool:
-            """
-            Checks if a method exists for a given path.
-            """
-            path = self._remove_query_params(path)
-
-            segments = self._split_path(path)
-            current_node = self.root
-            for segment in segments:
-                if segment in current_node.children:
-                    current_node = current_node.children[segment]
-                elif current_node.dynamic_child:
-                    current_node = current_node.dynamic_child
-                else:
-                    return False
-            return method in current_node.handler
-
-        for method in methods:
-            return _check_if_method_exists(path, method)
-        return False
+        segments = self._split_path(path)
+        current_node = self.root
+        for segment in segments:
+            if segment in current_node.children:
+                current_node = current_node.children[segment]
+            elif current_node.dynamic_child:
+                current_node = current_node.dynamic_child
+            else:
+                return False
+        return any(method in current_node.handler for method in methods)
 
     def log(self, level: str, message: str) -> None:
         """

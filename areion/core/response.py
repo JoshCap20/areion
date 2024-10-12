@@ -89,7 +89,13 @@ class ContentType:
 
 
 class HttpResponse:
-    def __init__(self, body="", status_code=200, content_type=None, headers=None):
+    def __init__(
+        self,
+        body: str | dict | bytes = "",
+        status_code=200,
+        content_type=None,
+        headers=None,
+    ):
         """
         Initializes the HttpResponse object.
 
@@ -169,8 +175,12 @@ class HttpResponse:
         self.headers["Date"] = DateHeaderCache().get_date()
 
         # Construct response
-        response_line = f"HTTP/1.1 {self.status_code} {HTTP_STATUS_CODES.get(self.status_code, '')}\r\n".encode('utf-8')
-        headers = b"".join(f"{key}: {value}\r\n".encode('utf-8') for key, value in self.headers.items())
+        response_line = f"HTTP/1.1 {self.status_code} {HTTP_STATUS_CODES.get(self.status_code, '')}\r\n".encode(
+            "utf-8"
+        )
+        headers = b"".join(
+            f"{key}: {value}\r\n".encode("utf-8") for key, value in self.headers.items()
+        )
 
         return response_line + headers + b"\r\n" + body
 
