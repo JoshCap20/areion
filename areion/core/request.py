@@ -66,7 +66,7 @@ class HttpRequest:
 
         parsed_url = urlparse(path)
         self.path = parsed_url.path
-        self.query_params = parse_qs(parsed_url.query)
+        self.query_params = parsed_url.query
 
     def add_header(self, key: str, value: any) -> None:
         """
