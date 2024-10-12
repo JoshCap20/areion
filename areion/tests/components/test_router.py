@@ -1,7 +1,14 @@
 import unittest
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
-from ... import DefaultRouter as Router, NotFoundError, MethodNotAllowedError, HttpResponse, HttpRequest, HttpError
+from ... import (
+    DefaultRouter as Router,
+    NotFoundError,
+    MethodNotAllowedError,
+    HttpResponse,
+    HttpRequest,
+    HttpError,
+)
 
 
 class TestRouter(unittest.TestCase):
@@ -195,145 +202,173 @@ class TestRouter(unittest.TestCase):
         path = "/test?param1=value1&param2=value2"
         result = self.router._remove_query_params(path)
         self.assertEqual(result, "/test")
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "/test")
         self.assertEqual(request.method, "GET")
         self.assertEqual(request.headers, {})
-        self.assertEqual(request.query_params, {"param1": ["value1"], "param2": ["value2"]})
-        
+        self.assertEqual(
+            request.get_parsed_query_params(),
+            {"param1": ["value1"], "param2": ["value2"]},
+        )
+
+    def test__remove_query_params_parsed_no_query(self):
+        # Test if _remove_query_params correctly handles paths with no query parameters
+        path = "/test"
+        result = self.router._remove_query_params(path)
+        self.assertEqual(result, "/test")
+
+        request = HttpRequest("GET", path, {})
+        self.assertEqual(request.path, "/test")
+        self.assertEqual(request.method, "GET")
+        self.assertEqual(request.headers, {})
+        self.assertEqual(request.get_parsed_query_params(), {})
+        self.assertEqual(request.get_raw_query_params(), "")
+
     def test__remove_query_params_no_query(self):
         # Test if _remove_query_params correctly handles paths with no query parameters
         path = "/test"
         result = self.router._remove_query_params(path)
         self.assertEqual(result, "/test")
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "/test")
         self.assertEqual(request.method, "GET")
         self.assertEqual(request.headers, {})
-        self.assertEqual(request.query_params, {})
-        
+        self.assertEqual(request.query_params, "")
+
     def test__remove_query_params_no_path(self):
         # Test if _remove_query_params correctly handles empty paths
         path = ""
         result = self.router._remove_query_params(path)
         self.assertEqual(result, "")
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "")
         self.assertEqual(request.method, "GET")
         self.assertEqual(request.headers, {})
-        self.assertEqual(request.query_params, {})
-        
+        self.assertEqual(request.query_params, "")
+
     def test__remove_query_params_no_path_or_query(self):
         # Test if _remove_query_params correctly handles empty paths with no query parameters
         path = "?param1=value1&param2=value2"
         result = self.router._remove_query_params(path)
         self.assertEqual(result, "")
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "")
         self.assertEqual(request.method, "GET")
         self.assertEqual(request.headers, {})
-        self.assertEqual(request.query_params, {"param1": ["value1"], "param2": ["value2"]})
-        
+        self.assertEqual(
+            request.get_parsed_query_params(),
+            {"param1": ["value1"], "param2": ["value2"]},
+        )
+
     def test__remove_query_params_no_query_params(self):
         # Test if _remove_query_params correctly handles paths with no query parameters
         path = "/test?"
         result = self.router._remove_query_params(path)
         self.assertEqual(result, "/test")
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "/test")
         self.assertEqual(request.method, "GET")
         self.assertEqual(request.headers, {})
-        self.assertEqual(request.query_params, {})
-        
+        self.assertEqual(request.get_parsed_query_params(), {})
+
     def test__split_path_no_path(self):
         # Test if _split_path correctly handles empty paths
         path = ""
         result = self.router._split_path(path)
         self.assertEqual(result, [])
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "")
         self.assertEqual(request.method, "GET")
         self.assertEqual(request.headers, {})
-        self.assertEqual(request.query_params, {})
-        
-        
+        self.assertEqual(request.get_parsed_query_params(), {})
+
     def test__split_path_no_slashes(self):
         # Test if _split_path correctly handles paths with no slashes
         path = "test"
         result = self.router._split_path(path)
         self.assertEqual(result, ["test"])
-        
+
         request = HttpRequest("POST", path, {})
         self.assertEqual(request.path, "test")
         self.assertEqual(request.method, "POST")
         self.assertEqual(request.headers, {})
-        self.assertEqual(request.query_params, {})
-        
+        self.assertEqual(request.query_params, "")
+
     def test__split_path_single_slash(self):
         # Test if _split_path correctly handles paths with a single slash
         path = "/test"
         result = self.router._split_path(path)
         self.assertEqual(result, ["test"])
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "/test")
-        self.assertEqual(request.query_params, {})
-        
+        self.assertEqual(request.get_parsed_query_params(), {})
+
     def test__split_path_multiple_slashes(self):
         # Test if _split_path correctly handles paths with multiple slashes
         path = "/test/route"
         result = self.router._split_path(path)
         self.assertEqual(result, ["test", "route"])
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "/test/route")
-        self.assertEqual(request.query_params, {})
-        
+        self.assertEqual(request.query_params, "")
+        self.assertEqual(request.get_parsed_query_params(), {})
+        self.assertEqual(request.get_raw_query_params(), "")
+
     def test__split_path_trailing_slash(self):
         # Test if _split_path correctly handles paths with a trailing slash
         path = "/test/"
         result = self.router._split_path(path)
         self.assertEqual(result, ["test"])
-        
+
     def test__split_path_leading_slash(self):
         # Test if _split_path correctly handles paths with a leading slash
         path = "/test"
         result = self.router._split_path(path)
         self.assertEqual(result, ["test"])
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "/test")
-        self.assertEqual(request.query_params, {})
-        
+        self.assertEqual(request.query_params, "")
+        self.assertEqual(request.get_parsed_query_params(), {})
+        self.assertEqual(request.get_raw_query_params(), "")
+
     def test__split_path_leading_and_trailing_slash(self):
         # Test if _split_path correctly handles paths with leading and trailing slashes
         path = "/test/"
         result = self.router._split_path(path)
         self.assertEqual(result, ["test"])
-        
+
     def test__split_path_multiple_segments(self):
         # Test if _split_path correctly handles paths with multiple segments
         path = "/test/route/segment"
         result = self.router._split_path(path)
         self.assertEqual(result, ["test", "route", "segment"])
-        
+
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "/test/route/segment")
-        self.assertEqual(request.query_params, {})
-        
+        self.assertEqual(request.query_params, "")
+        self.assertEqual(request.get_parsed_query_params(), {})
+        self.assertEqual(request.get_raw_query_params(), "")
+
     def test__split_path_and_query_params(self):
         # Create a response and then check its path, query_params, and query_string
         path = "/test?param1=value1&param2=value2"
         request = HttpRequest("GET", path, {})
         self.assertEqual(request.path, "/test")
-        self.assertEqual(request.query_params, {"param1": ["value1"], "param2": ["value2"]})
-        
+        self.assertEqual(
+            request.get_parsed_query_params(),
+            {"param1": ["value1"], "param2": ["value2"]},
+        )
+        self.assertEqual(request.get_raw_query_params(), "param1=value1&param2=value2")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -38,21 +38,30 @@ class TestHttpRequest(unittest.TestCase):
         self.assertEqual(self.request.get_metadata("session_id"), "abc123")
 
     def test_get_query_params(self):
-        self.assertEqual(self.request.query_params, {})
+        self.assertEqual(self.request.query_params, "")
         request = HttpRequest("GET", "/test?param1=value1&param2=value2", {})
         self.assertEqual(
-            request.query_params, {"param1": ["value1"], "param2": ["value2"]}
+            request.get_parsed_query_params(),
+            {"param1": ["value1"], "param2": ["value2"]},
         )
+        self.assertEqual(request.get_raw_query_params(), "param1=value1&param2=value2")
+        self.assertEqual(request.query_params, "param1=value1&param2=value2")
 
     def test_get_query_params_no_query(self):
-        self.assertEqual(self.request.query_params, {})
+        self.assertEqual(self.request.query_params, "")
+        self.assertEqual(self.request.get_parsed_query_params(), {})
         request = HttpRequest("GET", "/test", {})
-        self.assertEqual(request.query_params, {})
+        self.assertEqual(request.query_params, "")
+        self.assertEqual(request.get_parsed_query_params(), {})
 
     def test_get_query_params_multiple_values(self):
-        self.assertEqual(self.request.query_params, {})
+        self.assertEqual(self.request.query_params, "")
         request = HttpRequest("GET", "/test?param1=value1&param1=value2", {})
-        self.assertEqual(request.query_params, {"param1": ["value1", "value2"]})
+        self.assertEqual(
+            request.get_parsed_query_params(), {"param1": ["value1", "value2"]}
+        )
+        self.assertEqual(request.get_raw_query_params(), "param1=value1&param1=value2")
+        self.assertEqual(request.query_params, "param1=value1&param1=value2")
 
     def test_get_body(self):
         self.request.body = "New Body"
@@ -75,7 +84,7 @@ class TestHttpRequest(unittest.TestCase):
         self.assertEqual(repr(self.request), expected_repr)
 
     def test_str(self):
-        expected_str = f"[{self.method}] {self.path}"
+        expected_str = f"<HttpRequest method={self.method} path={self.path} query_params={self.query_params} headers={self.headers} metadata={self.metadata}>"
         self.assertEqual(str(self.request), expected_str)
 
     def test_as_dict_default(self):
