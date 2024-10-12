@@ -33,6 +33,9 @@ We designed Areion to have as few dependencies as possible. We created our own H
 - [Core Components](#core-components)
   - [AreionServer](#areionserver)
   - [Router](#router)
+    - [FastAPI-like Route Definition Example](#fastapi-like-route-definition-example)
+    - [Subrouter (Grouping Routes) Example](#subrouter-grouping-routes-example)
+    - [Django-like Route Definition Example](#django-like-route-definition-example)
   - [HttpServer](#httpserver)
 - [Default Component Implementation](#default-component-implementation)
   - [Orchestrator](#orchestrator)
@@ -281,6 +284,10 @@ The `Router` class manages URL routes and their corresponding handlers. If no me
 - **Method Specification:** Handlers can specify allowed HTTP methods.
 - **Middleware Support:** Allows adding global and route-specific middleware.
 
+#### FastAPI-like Route Definition Example
+
+This default usage is similar to Flask and FastAPI, with decorators for defining routes and middleware.
+
 **Usage:**
 
 ```python
@@ -302,6 +309,59 @@ def log_request(handler):
 
 router.add_global_middleware(log_request)
 ```
+
+#### Subrouter (Grouping Routes) Example
+
+`main.py`:
+
+```python
+from areion import DefaultRouter
+
+from areion import (
+    AreionServer,
+    AreionServerBuilder,
+    DefaultLogger,
+    DefaultEngine,
+    DefaultRouter,
+    HttpResponse
+)
+from users import users_router
+
+main_router = DefaultRouter()
+main_router.include_router(users_router)
+
+logger = DefaultLogger(log_file="server.log")
+engine = DefaultEngine()
+
+server: AreionServer = (
+    AreionServerBuilder()
+        .with_router(main_router)
+        .with_engine(engine)
+        .with_logger(logger)
+    .build()
+)
+
+if __name__ == "__main__":
+    server.run()
+```
+
+`users.py`:
+
+```python
+from areion import DefaultRouter, HttpResponse
+
+users_router = DefaultRouter(prefix="/users")
+
+@users_router.route("/", methods=["GET"])
+def get_all_users(request):
+    return HttpResponse(status_code=200, body={"users": []}, content_type="application/json")
+
+@users_router.route("/:user_id", methods=["GET"])
+def get_user(request, user_id):
+    return HttpResponse(status_code=200, body={"user_id": user_id}, content_type="application/json")
+```
+
+#### Django-like Route Definition Example
 
 You can also use a Django-like syntax for defining routes:
 
@@ -558,10 +618,12 @@ Manages URL routes and their handlers.
 **Methods:**
 
 - `add_route(path, handler, methods, middlewares)`: Adds a route.
-- `route(path, methods, middlewares)`: Decorator for adding routes.
-- `group(base_path, middlewares)`: Creates a sub-router (group).
-- `add_global_middleware(middleware)`: Adds a global middleware.
+- `route(path, methods, middlewares)`: A decorator to define a route with optional middlewares.
+- `include_router(router)`: Includes all routes from the given sub-router into the current router.
+- `group(base_path, middlewares)`: Creates a sub-router with a base path and optional group-specific middlewares.
+- `add_global_middleware(middleware)`: Adds a middleware that will be applied globally to all routes.
 - `get_handler(method, path)`: Retrieves the handler for a given path and method.
+- `get_allowed_methods(path)`: Retrieves the allowed methods for a given path.
 
 ### HttpRequest and HttpResponse
 
