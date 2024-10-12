@@ -202,14 +202,14 @@ Below is a simple example to get you started with Areion.
 
 ```python
 
-from areion import AreionServerBuilder, DefaultRouter
+from areion import AreionServerBuilder, DefaultRouter, HttpRequest
 
 # Initialize the router
 router = DefaultRouter()
 
 # Define a simple route
 @router.route("/hello")
-def hello_world(request):
+def hello_world(request: HttpRequest):
     return "Hello, World!"
 
 # Build and run the server
@@ -358,6 +358,9 @@ def get_all_users(request):
 
 @users_router.route("/:user_id", methods=["GET"])
 def get_user(request, user_id):
+    body = request.get_parsed_body()
+    if not body.get("token"):
+        return HttpResponse(status_code=401, body="Unauthorized", content_type="text/plain")
     return HttpResponse(status_code=200, body={"user_id": user_id}, content_type="application/json")
 ```
 
@@ -645,8 +648,11 @@ Represents an HTTP request. These are injected into each route handler as the fi
 
 - `add_header(key, value)`: Adds a header.
 - `get_header(key)`: Retrieves a header value.
-- `get_body()`: Retrieves the request body.
+- `get_parsed_body()`: Retrieves the request body as a dictionary.
+- `get_raw_body()`: Retrieves the raw request body.
 - `get_query_param(key)`: Retrieves a query parameter.
+- `get_raw_query_params()`: Retrieves the raw query parameters.
+- `get_parsed_query_params()`: Retrieves the query parameters as a dictionary.
 - `add_metadata(key, value)`: Adds metadata.
 - `get_metadata(key)`: Retrieves metadata.
 - `render_template(template_name, context)`: Renders a template.

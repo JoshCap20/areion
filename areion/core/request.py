@@ -3,7 +3,8 @@ HttpRequest is the representation of the request passed to route handlers by the
 """
 
 from .response import HttpResponse
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qsl
+import orjson
 
 
 class HttpRequest:
@@ -25,8 +26,10 @@ class HttpRequest:
             Adds a header to the request.
         get_header(key: str) -> str | None:
             Retrieve the value of a specified header.
-        get_body() -> str | None:
-            Retrieve the body of the request, if available.
+        get_raw_body() -> str | None:
+            Retrieve the raw request body as a str if available.
+        get_parsed_body() -> dict:
+            Retrieve the parsed request body as a dictionary.
         add_metadata(key: str, value: any) -> None:
             Adds a metadata entry to the request.
         get_metadata(key: str) -> any:
@@ -86,14 +89,22 @@ class HttpRequest:
             str or None: The value of the specified header if it exists, otherwise None.
         """
         return self.headers.get(key)
+    
+    def get_parsed_body(self) -> dict:
+        """
+        Parse the body of the request and return it as a dictionary.
+        Returns:
+            dict: A dictionary containing the parsed body of the request.
+        """
+        return orjson.loads(self.body) if self.body else {}
 
-    def get_body(self) -> str | None:
+    def get_raw_body(self) -> str | None:
         """
         Retrieve the body of the request.
         Returns:
             str or None: The body of the request if it exists, otherwise None.
         """
-        return self.body
+        return self.body if self.body else None
 
     def add_metadata(self, key: str, value: any) -> None:
         """
@@ -138,7 +149,7 @@ class HttpRequest:
         Returns:
             dict: A dictionary containing the parsed query parameters.
         """
-        return parse_qs(self.query_params)
+        return dict(parse_qsl(self.query_params))
 
     def render_template(self, template_name: str, context: dict = None) -> str:
         """
@@ -199,7 +210,7 @@ class HttpRequest:
                 "query_params": self.get_parsed_query_params(),
                 "headers": self.headers,
                 "metadata": self.metadata,
-                "body": self.body,
+                "body": self.get_parsed_body(),
                 "logger": self.logger,
                 "engine": self.engine,
                 "orchestrator": self.orchestrator,
@@ -210,7 +221,7 @@ class HttpRequest:
             "query_params": self.get_parsed_query_params(),
             "headers": self.headers,
             "metadata": self.metadata,
-            "body": self.body,
+            "body": self.get_parsed_body(),
         }
 
     def __repr__(self) -> str:
