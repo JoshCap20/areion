@@ -209,7 +209,7 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(request.headers, {})
         self.assertEqual(
             request.get_parsed_query_params(),
-            {"param1": ["value1"], "param2": ["value2"]},
+            {"param1": "value1", "param2": "value2"},
         )
 
     def test__remove_query_params_parsed_no_query(self):
@@ -261,7 +261,7 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(request.headers, {})
         self.assertEqual(
             request.get_parsed_query_params(),
-            {"param1": ["value1"], "param2": ["value2"]},
+            {"param1": "value1", "param2": "value2"},
         )
 
     def test__remove_query_params_no_query_params(self):
@@ -365,7 +365,7 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(request.path, "/test")
         self.assertEqual(
             request.get_parsed_query_params(),
-            {"param1": ["value1"], "param2": ["value2"]},
+            {"param1": "value1", "param2": "value2"},
         )
         self.assertEqual(request.get_raw_query_params(), "param1=value1&param2=value2")
 

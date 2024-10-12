@@ -35,7 +35,7 @@ from .utils import (
     create_xml_response,
 )
 
-__version__ = "v1.1.10"
+__version__ = "v1.1.11"
 
 __all__ = [
     # Main classes
