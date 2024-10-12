@@ -236,6 +236,9 @@ class HttpServer:
                 )
 
                 self.log("error", f"[RESPONSE] {e}")
+                
+            if not isinstance(response, HttpResponse):
+                response = HttpResponse(body=response)
 
             # Handle keep-alive connections
             # TODO
@@ -268,8 +271,6 @@ class HttpServer:
 
     async def _send_response(self, writer, response):
         # Recommended to use HttpResponse class for responses
-        if not isinstance(response, HttpResponse):
-            response = HttpResponse(body=response)
 
         # TODO: Add interceptor component here
 
