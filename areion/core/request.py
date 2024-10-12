@@ -28,7 +28,7 @@ class HttpRequest:
             Retrieve the value of a specified header.
         get_raw_body() -> str | None:
             Retrieve the raw request body as a str if available.
-        get_parsed_body() -> dict:
+        get_parsed_body() -> dict | str | None:
             Retrieve the parsed request body as a dictionary.
         add_metadata(key: str, value: any) -> None:
             Adds a metadata entry to the request.
@@ -70,7 +70,7 @@ class HttpRequest:
         parsed_url = urlparse(path)
         self.path = parsed_url.path
         self.query_params = parsed_url.query
-        
+
         # Internal variables for lazy parsing
         self._parsed_body = None
         self._parsed_query_params = None
@@ -93,7 +93,7 @@ class HttpRequest:
             str or None: The value of the specified header if it exists, otherwise None.
         """
         return self.headers.get(key)
-    
+
     def get_parsed_body(self) -> dict | str | None:
         """
         Lazily parse the body of the request and return it as a dictionary or string.
@@ -151,7 +151,6 @@ class HttpRequest:
             dict: The parsed form data.
         """
         return dict(parse_qsl(self.body.decode("utf-8")))
-
 
     def get_raw_body(self) -> str | None:
         """
@@ -262,7 +261,7 @@ class HttpRequest:
         else:
             print(f"[{level.upper()}] {message}")
 
-    def as_dict(self, show_components: bool = False):
+    def as_dict(self, show_components: bool = False) -> dict:
         """
         Returns a dictionary representation of the HttpRequest instance.
 
@@ -281,11 +280,13 @@ class HttpRequest:
             "body": self.get_parsed_body(),
         }
         if show_components:
-            base_dict.update({
-                "logger": self.logger,
-                "engine": self.engine,
-                "orchestrator": self.orchestrator,
-            })
+            base_dict.update(
+                {
+                    "logger": self.logger,
+                    "engine": self.engine,
+                    "orchestrator": self.orchestrator,
+                }
+            )
         return base_dict
 
     def __repr__(self) -> str:
@@ -293,6 +294,7 @@ class HttpRequest:
 
     def __str__(self) -> str:
         return self.__repr__()
+
 
 class HttpRequestFactory:
     def __init__(self, logger=None, engine=None, orchestrator=None):
