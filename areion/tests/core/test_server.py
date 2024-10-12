@@ -144,7 +144,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
         # Verify that the handler was called
         self.mock_router.get_handler.assert_called_with("GET", "/test")
         self.mock_request_factory.create.assert_called_with(
-            "GET", "/test", {"Host": "localhost"}, b""
+            method='GET', path='/test', headers={'Host': 'localhost'}, body=b''
         )
         mock_handler.assert_awaited_with(mock_request, **{})
 
