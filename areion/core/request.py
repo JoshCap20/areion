@@ -122,7 +122,23 @@ class HttpRequest:
         Returns:
             Any: The value associated with the specified key, or None if the key is not found.
         """
-        return self.query_params.get(key)
+        return self.get_parsed_query_params().get(key)
+
+    def get_raw_query_params(self) -> str:
+        """
+        Retrieve the raw query parameters from the request URL.
+        Returns:
+            str: The query parameters as an unparsed string.
+        """
+        return self.query_params
+
+    def get_parsed_query_params(self) -> dict:
+        """
+        Parse the query parameters from the request URL and return them as a dictionary.
+        Returns:
+            dict: A dictionary containing the parsed query parameters.
+        """
+        return parse_qs(self.query_params)
 
     def render_template(self, template_name: str, context: dict = None) -> str:
         """
@@ -180,7 +196,7 @@ class HttpRequest:
             return {
                 "method": self.method,
                 "path": self.path,
-                "query_params": self.query_params,
+                "query_params": self.get_parsed_query_params(),
                 "headers": self.headers,
                 "metadata": self.metadata,
                 "body": self.body,
@@ -191,17 +207,17 @@ class HttpRequest:
         return {
             "method": self.method,
             "path": self.path,
-            "query_params": self.query_params,
+            "query_params": self.get_parsed_query_params(),
             "headers": self.headers,
             "metadata": self.metadata,
             "body": self.body,
         }
 
     def __repr__(self) -> str:
-        return f"<HttpRequest method={self.method} path={self.path} query_params={self.query_params} headers={self.headers} metadata={self.metadata}>"
+        return f"<HttpRequest method={self.method} path={self.path} query_params={self.get_parsed_query_params()} headers={self.headers} metadata={self.metadata}>"
 
     def __str__(self) -> str:
-        return f"[{self.method}] {self.path}"
+        return f"<HttpRequest method={self.method} path={self.path} query_params={self.get_parsed_query_params()} headers={self.headers} metadata={self.metadata}>"
 
 
 class HttpRequestFactory:
