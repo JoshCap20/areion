@@ -177,7 +177,7 @@ class HttpServer:
 
             try:
                 request: HttpRequest = self.request_factory.create(
-                    method, path, headers, body
+                    method=method, path=path, headers=headers, body=body
                 )
                 # self.log("info", f"[REQUEST] {request}")
                 try:
@@ -206,6 +206,8 @@ class HttpServer:
                     )
                 elif method == "HEAD":
                     response = await handler(request, **path_params)
+                    if not isinstance(response, HttpResponse):
+                        response = HttpResponse(body=response)
                     response.body = b""
                 elif request.method == "CONNECT":
                     response = HttpResponse(
@@ -236,6 +238,9 @@ class HttpServer:
                 )
 
                 self.log("error", f"[RESPONSE] {e}")
+                
+            if not isinstance(response, HttpResponse):
+                response = HttpResponse(body=response)
 
             # Handle keep-alive connections
             # TODO
