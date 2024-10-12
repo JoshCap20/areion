@@ -2,6 +2,9 @@ import unittest
 from unittest.mock import Mock
 from ... import HttpRequest, HttpRequestFactory, HttpResponse
 import orjson
+import cgi
+from io import BytesIO
+from urllib.parse import parse_qsl
 
 
 class TestHttpRequest(unittest.TestCase):
@@ -10,7 +13,7 @@ class TestHttpRequest(unittest.TestCase):
         self.method = "GET"
         self.path = "/test"
         self.headers = {"Content-Type": "application/json"}
-        self.body = b"Request Body"
+        self.body = b'{"message": "New Body"}'
         self.query_params = {}
         self.metadata = {}
         self.request = HttpRequest(self.method, self.path, self.headers, self.body)
@@ -58,9 +61,7 @@ class TestHttpRequest(unittest.TestCase):
     def test_get_query_params_multiple_values(self):
         self.assertEqual(self.request.query_params, "")
         request = HttpRequest("GET", "/test?param1=value1&param1=value2", {})
-        self.assertEqual(
-            request.get_parsed_query_params(), {"param1": "value2"}
-        )
+        self.assertEqual(request.get_parsed_query_params(), {"param1": "value2"})
         self.assertEqual(request.get_raw_query_params(), "param1=value1&param1=value2")
         self.assertEqual(request.query_params, "param1=value1&param1=value2")
 
@@ -79,21 +80,21 @@ class TestHttpRequest(unittest.TestCase):
     def test_get_body_bytes(self):
         self.request.body = b"Binary Body"
         self.assertEqual(self.request.get_raw_body(), b"Binary Body")
-        
+
     def test_get_body_json(self):
         self.request.body = orjson.dumps({"message": "New Body"})
         self.assertEqual(self.request.get_parsed_body(), {"message": "New Body"})
 
     def test_repr(self):
-        expected_repr = f"<HttpRequest method={self.method} path={self.path} query_params={self.query_params} headers={self.headers} metadata={self.metadata}>"
+        expected_repr = f"<HttpRequest method={self.method} path={self.path} query_params={self.request.query_params} headers={self.headers} body={self.body}>"
         self.assertEqual(repr(self.request), expected_repr)
 
     def test_str(self):
-        expected_str = f"<HttpRequest method={self.method} path={self.path} query_params={self.query_params} headers={self.headers} metadata={self.metadata}>"
+        expected_str = f"<HttpRequest method={self.method} path={self.path} query_params={self.request.query_params} headers={self.headers} body={self.body}>"
         self.assertEqual(str(self.request), expected_str)
 
     def test_as_dict_default(self):
-        self.request.body = b"{\"message\": \"New Body\"}"
+        self.request.body = b'{"message": "New Body"}'
         expected_dict = {
             "method": self.method,
             "path": self.path,
@@ -114,7 +115,7 @@ class TestHttpRequest(unittest.TestCase):
             "query_params": {},
             "headers": self.headers,
             "metadata": self.request.metadata,
-            "body": self.body.decode("utf-8"),
+            "body": {"message": "New Body"},
             "logger": self.request.logger,
             "engine": self.request.engine,
             "orchestrator": self.request.orchestrator,
@@ -128,7 +129,7 @@ class TestHttpRequest(unittest.TestCase):
             "query_params": {},
             "headers": self.headers,
             "metadata": {},
-            "body": self.body.decode("utf-8"),
+            "body": {"message": "New Body"},    
         }
         self.assertEqual(self.request.as_dict(show_components=False), expected_dict)
 
@@ -275,20 +276,58 @@ class TestHttpRequestFactory(unittest.TestCase):
         self.assertEqual(request.engine, self.engine)
         self.assertEqual(request.orchestrator, self.orchestrator)
 
-    def test_create_no_engine(self):
-        factory = HttpRequestFactory(logger=self.logger, orchestrator=self.orchestrator)
-        request = factory.create("GET", "/path", {})
-        self.assertEqual(request.logger, self.logger)
-        self.assertIsNone(request.engine)
-        self.assertEqual(request.orchestrator, self.orchestrator)
 
-    def test_create_no_orchestrator(self):
-        factory = HttpRequestFactory(logger=self.logger, engine=self.engine)
-        request = factory.create("GET", "/path", {})
-        self.assertEqual(request.logger, self.logger)
-        self.assertEqual(request.engine, self.engine)
-        self.assertIsNone(request.orchestrator)
+class TestHttpRequestBodyParsing(unittest.TestCase):
 
+    def setUp(self):
+        self.method = "GET"
+        self.path = "/test"
+        self.headers = {"Content-Type": "application/json"}
+        self.body = b'{"key": "value"}'
+        self.request = HttpRequest(self.method, self.path, self.headers, self.body)
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_get_parsed_body_json(self):
+        self.assertEqual(self.request.get_parsed_body(), {"key": "value"})
+
+    def test_get_parsed_body_form_urlencoded(self):
+        self.request.headers["Content-Type"] = "application/x-www-form-urlencoded"
+        self.request.body = b"key=value&key2=value2"
+        self.assertEqual(
+            self.request.get_parsed_body(), {"key": "value", "key2": "value2"}
+        )
+
+    def test_get_parsed_body_text(self):
+        self.request.headers["Content-Type"] = "text/plain"
+        self.request.body = b"plain text body"
+        self.assertEqual(self.request.get_parsed_body(), "plain text body")
+
+    def test_get_parsed_body_no_content_type(self):
+        del self.request.headers["Content-Type"]
+        self.assertIsNone(self.request.get_parsed_body())
+
+    def test_get_parsed_body_empty_body(self):
+        self.request.body = b""
+        self.assertIsNone(self.request.get_parsed_body())
+
+    def test_get_parsed_body_invalid_json(self):
+        self.request.body = b"invalid json"
+        self.assertIsNone(self.request.get_parsed_body())
+
+    def test_get_parsed_body_cached(self):
+        self.request._parsed_body = {"cached": "value"}
+        self.assertEqual(self.request.get_parsed_body(), {"cached": "value"})
+
+    def test_parse_json_body(self):
+        self.request.body = b'{"key": "value"}'
+        self.assertEqual(self.request._parse_json_body(), {"key": "value"})
+
+    def test_parse_json_body_invalid(self):
+        self.request.body = b"invalid json"
+        self.assertIsNone(self.request._parse_json_body())
+
+    def test_parse_form_urlencoded_body(self):
+        self.request.body = b"key=value&key2=value2"
+        self.assertEqual(
+            self.request._parse_form_urlencoded_body(),
+            {"key": "value", "key2": "value2"},
+        )

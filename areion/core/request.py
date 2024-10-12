@@ -70,6 +70,10 @@ class HttpRequest:
         parsed_url = urlparse(path)
         self.path = parsed_url.path
         self.query_params = parsed_url.query
+        
+        # Internal variables for lazy parsing
+        self._parsed_body = None
+        self._parsed_query_params = None
 
     def add_header(self, key: str, value: any) -> None:
         """
@@ -92,16 +96,62 @@ class HttpRequest:
     
     def get_parsed_body(self) -> dict | str | None:
         """
-        Parse the body of the request and return it as a dictionary.
+        Lazily parse the body of the request and return it as a dictionary or string.
+
+        Supports 'application/json', 'application/x-www-form-urlencoded', and 'multipart/form-data'.
+
         Returns:
             dict or str or None: The parsed body of the request if it exists, otherwise None.
         """
+        if self._parsed_body is not None:
+            return self._parsed_body
+
         if not self.body:
             return None
+
+        content_type: str = self.get_header("Content-Type")
+        if not content_type:
+            return None
+
+        content_type_main = content_type.split(";")[0].strip()
+
+        try:
+            if content_type_main == "application/json":
+                self._parsed_body = self._parse_json_body()
+            elif content_type_main == "application/x-www-form-urlencoded":
+                self._parsed_body = self._parse_form_urlencoded_body()
+            elif content_type_main == "multipart/form-data":
+                self._parsed_body = self._parse_multipart_body(content_type)
+            else:
+                self._parsed_body = self.body.decode("utf-8")
+        except Exception as e:
+            self.log(f"Error parsing body: {e}", level="error")
+            self._parsed_body = None
+
+        return self._parsed_body
+
+    def _parse_json_body(self) -> dict | None:
+        """
+        Parse the JSON body of the request.
+
+        Returns:
+            dict or None: The parsed JSON body, or None if parsing fails.
+        """
         try:
             return orjson.loads(self.body)
-        except orjson.JSONDecodeError:
-            return self.body.decode("utf-8")
+        except orjson.JSONDecodeError as e:
+            self.log(f"JSON parsing error: {e}", level="error")
+            return None
+
+    def _parse_form_urlencoded_body(self) -> dict:
+        """
+        Parse 'application/x-www-form-urlencoded' body.
+
+        Returns:
+            dict: The parsed form data.
+        """
+        return dict(parse_qsl(self.body.decode("utf-8")))
+
 
     def get_raw_body(self) -> str | None:
         """
@@ -150,11 +200,16 @@ class HttpRequest:
 
     def get_parsed_query_params(self) -> dict:
         """
-        Parse the query parameters from the request URL and return them as a dictionary.
+        Lazily parse the query parameters from the request URL and return them as a dictionary.
+
         Returns:
             dict: A dictionary containing the parsed query parameters.
         """
-        return dict(parse_qsl(self.query_params))
+        if self._parsed_query_params is not None:
+            return self._parsed_query_params
+
+        self._parsed_query_params = dict(parse_qsl(self.query_params))
+        return self._parsed_query_params
 
     def render_template(self, template_name: str, context: dict = None) -> str:
         """
@@ -208,19 +263,16 @@ class HttpRequest:
             print(f"[{level.upper()}] {message}")
 
     def as_dict(self, show_components: bool = False):
-        if show_components:
-            return {
-                "method": self.method,
-                "path": self.path,
-                "query_params": self.get_parsed_query_params(),
-                "headers": self.headers,
-                "metadata": self.metadata,
-                "body": self.get_parsed_body(),
-                "logger": self.logger,
-                "engine": self.engine,
-                "orchestrator": self.orchestrator,
-            }
-        return {
+        """
+        Returns a dictionary representation of the HttpRequest instance.
+
+        Args:
+            show_components (bool): Whether to include components like logger, engine, and orchestrator.
+
+        Returns:
+            dict: The dictionary representation of the HttpRequest.
+        """
+        base_dict = {
             "method": self.method,
             "path": self.path,
             "query_params": self.get_parsed_query_params(),
@@ -228,13 +280,19 @@ class HttpRequest:
             "metadata": self.metadata,
             "body": self.get_parsed_body(),
         }
+        if show_components:
+            base_dict.update({
+                "logger": self.logger,
+                "engine": self.engine,
+                "orchestrator": self.orchestrator,
+            })
+        return base_dict
 
     def __repr__(self) -> str:
-        return f"<HttpRequest method={self.method} path={self.path} query_params={self.get_parsed_query_params()} headers={self.headers} metadata={self.metadata}>"
+        return f"<HttpRequest method={self.method} path={self.path} query_params={self.query_params} headers={self.headers} body={self.body}>"
 
     def __str__(self) -> str:
-        return f"<HttpRequest method={self.method} path={self.path} query_params={self.get_parsed_query_params()} headers={self.headers} metadata={self.metadata}>"
-
+        return self.__repr__()
 
 class HttpRequestFactory:
     def __init__(self, logger=None, engine=None, orchestrator=None):
