@@ -16,7 +16,7 @@ class SwaggerHandler:
             routes and retrieve route information.
 
     Can be toggled on via:
-        1. Setting development flag on AerionServerBuilder
+        1. Setting development flag on AreionServerBuilder
         2. Setting ENV variable to 'development'
     """
 
@@ -64,13 +64,16 @@ class SwaggerHandler:
         }
 
         for route in self.router.route_info:
-            path = route["path"]
+            original_path = route["path"]
             method = route["method"].lower()
             handler = route["handler"]
             doc = (
                 inspect.getdoc(handler)
                 or "No documentation available for this endpoint."
             )
+
+            # Convert :param to {param} in the path
+            path, path_params = self._convert_path_params(original_path)
 
             # Parse docstring for summary, description, parameters, and responses
             summary, description, doc_params, response_description = (
@@ -80,29 +83,23 @@ class SwaggerHandler:
             parameters = []
             request_body_content = None
 
-            # Get dynamic segments from path
-            path_segments = self.split_path(path)
-            path_params = [
-                segment[1:] for segment in path_segments if segment.startswith(":")
-            ]
+            # Add path parameters to parameters list
+            for param_name in path_params:
+                parameter_spec = {
+                    "name": param_name,
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string"},
+                    "description": f"Path parameter: {param_name}",
+                }
+                parameters.append(parameter_spec)
 
+            # Handle query and body parameters
             for param_name, param_info in doc_params.items():
-                # Determine if parameter is in path, query, or request body
                 if param_name in path_params:
-                    param_in = "path"
-                    required = True
-                elif method in ["post", "put", "patch"]:
+                    continue  # Already added as a path parameter
+                if method in ["post", "put", "patch"]:
                     # For request body parameters
-                    param_in = "body"
-                    required = param_info.get("required", True)
-                else:
-                    param_in = "query"
-                    required = param_info.get("required", False)
-
-                openapi_type = param_info.get("type", "string")
-                description = param_info.get("description", "")
-
-                if param_in == "body":
                     if request_body_content is None:
                         request_body_content = {
                             "application/json": {
@@ -115,18 +112,22 @@ class SwaggerHandler:
                         }
                     request_body_content["application/json"]["schema"]["properties"][
                         param_name
-                    ] = {"type": openapi_type, "description": description}
-                    if required:
+                    ] = {
+                        "type": param_info.get("type", "string"),
+                        "description": param_info.get("description", ""),
+                    }
+                    if param_info.get("required", False):
                         request_body_content["application/json"]["schema"][
                             "required"
                         ].append(param_name)
                 else:
+                    # Query parameters
                     parameter_spec = {
                         "name": param_name,
-                        "in": param_in,
-                        "required": required,
-                        "schema": {"type": openapi_type},
-                        "description": description,
+                        "in": "query",
+                        "required": param_info.get("required", False),
+                        "schema": {"type": param_info.get("type", "string")},
+                        "description": param_info.get("description", ""),
                     }
                     parameters.append(parameter_spec)
 
@@ -155,6 +156,23 @@ class SwaggerHandler:
 
         return openapi_spec
 
+    def _convert_path_params(self, path):
+        """
+        Converts :param in the path to {param} for OpenAPI spec and
+        returns the list of path parameters.
+        """
+        path_params = []
+        converted_path = ""
+        segments = self.split_path(path)
+        for segment in segments:
+            if segment.startswith(":"):
+                param_name = segment[1:]
+                path_params.append(param_name)
+                converted_path += "/{" + param_name + "}"
+            else:
+                converted_path += "/" + segment
+        return converted_path or "/", path_params
+
     def _parse_docstring(self, doc):
         """
         Parse the docstring to extract summary, description, parameters, and response details.
@@ -165,6 +183,7 @@ class SwaggerHandler:
         Returns:
             tuple: summary, description, parameters, response_description
         """
+        parameter_names = ["parameters:", "params:", "args:", "arguments:"]
         lines = doc.strip().split("\n")
         summary = lines[0].strip() if lines else ""
         description_lines = []
@@ -172,13 +191,13 @@ class SwaggerHandler:
         response_description = ""
 
         current_section = None
-        param_pattern = re.compile(r"^(\s*)([\w_]+)\s*\(([\w\[\]]+)\):\s*(.+)")
+        param_pattern = re.compile(r"^\s*([\w_]+)\s*\(([\w\[\]]+)\):\s*(.+)")
         for line in lines[1:]:
             stripped_line = line.strip()
             if not stripped_line:
                 continue  # skip empty lines
 
-            if stripped_line.lower() == "parameters:":
+            if stripped_line.lower() in parameter_names:
                 current_section = "parameters"
                 continue
             elif stripped_line.lower() == "returns:":
@@ -186,9 +205,9 @@ class SwaggerHandler:
                 continue
             elif current_section == "parameters":
                 # Try to match a parameter definition
-                match = param_pattern.match(line)
+                match = param_pattern.match(stripped_line)
                 if match:
-                    indent, param_name, param_type, param_desc = match.groups()
+                    param_name, param_type, param_desc = match.groups()
                     required = True
                     default_match = re.search(
                         r"\(default\s*is\s*([^)]+)\)", param_desc, re.IGNORECASE
@@ -199,18 +218,15 @@ class SwaggerHandler:
                             default_match.group(0), ""
                         ).strip()
                     parameters[param_name] = {
-                        "type": SwaggerHandler.map_python_type_to_openapi(param_type),
+                        "type": self.map_python_type_to_openapi(param_type),
                         "description": param_desc,
                         "required": required,
                     }
                 else:
-                    # Maybe a continuation of the previous parameter's description
-                    if parameters and line.startswith(" " * 4):
+                    # Continuation of previous parameter description
+                    if parameters:
                         last_param = list(parameters.keys())[-1]
                         parameters[last_param]["description"] += " " + stripped_line
-                    else:
-                        # Unindented line, exit parameters section
-                        current_section = None
             elif current_section == "returns":
                 # Collect return description
                 if not response_description:
@@ -219,7 +235,7 @@ class SwaggerHandler:
                     response_description += " " + stripped_line
             else:
                 # Accumulate description
-                description_lines.append(line)
+                description_lines.append(stripped_line)
 
         description = (
             "\n".join(description_lines).strip()
@@ -250,4 +266,4 @@ class SwaggerHandler:
             type(None): "null",
             "None": "null",
         }
-        return type_mapping.get(python_type, "any")
+        return type_mapping.get(python_type, "string")
