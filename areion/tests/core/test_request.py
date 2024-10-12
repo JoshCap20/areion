@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import Mock
 from ... import HttpRequest, HttpRequestFactory, HttpResponse
+import orjson
 
 
 class TestHttpRequest(unittest.TestCase):
@@ -9,7 +10,7 @@ class TestHttpRequest(unittest.TestCase):
         self.method = "GET"
         self.path = "/test"
         self.headers = {"Content-Type": "application/json"}
-        self.body = "Request Body"
+        self.body = b"Request Body"
         self.query_params = {}
         self.metadata = {}
         self.request = HttpRequest(self.method, self.path, self.headers, self.body)
@@ -42,7 +43,7 @@ class TestHttpRequest(unittest.TestCase):
         request = HttpRequest("GET", "/test?param1=value1&param2=value2", {})
         self.assertEqual(
             request.get_parsed_query_params(),
-            {"param1": ["value1"], "param2": ["value2"]},
+            {"param1": "value1", "param2": "value2"},
         )
         self.assertEqual(request.get_raw_query_params(), "param1=value1&param2=value2")
         self.assertEqual(request.query_params, "param1=value1&param2=value2")
@@ -58,26 +59,30 @@ class TestHttpRequest(unittest.TestCase):
         self.assertEqual(self.request.query_params, "")
         request = HttpRequest("GET", "/test?param1=value1&param1=value2", {})
         self.assertEqual(
-            request.get_parsed_query_params(), {"param1": ["value1", "value2"]}
+            request.get_parsed_query_params(), {"param1": "value2"}
         )
         self.assertEqual(request.get_raw_query_params(), "param1=value1&param1=value2")
         self.assertEqual(request.query_params, "param1=value1&param1=value2")
 
     def test_get_body(self):
-        self.request.body = "New Body"
-        self.assertEqual(self.request.get_body(), "New Body")
+        self.request.body = orjson.dumps({"message": "New Body"})
+        self.assertEqual(self.request.get_parsed_body(), {"message": "New Body"})
 
     def test_get_body_none(self):
         self.request.body = None
-        self.assertIsNone(self.request.get_body())
+        self.assertEqual(self.request.get_parsed_body(), None)
 
     def test_get_body_empty(self):
         self.request.body = ""
-        self.assertEqual(self.request.get_body(), "")
+        self.assertEqual(self.request.get_parsed_body(), None)
 
     def test_get_body_bytes(self):
         self.request.body = b"Binary Body"
-        self.assertEqual(self.request.get_body(), b"Binary Body")
+        self.assertEqual(self.request.get_raw_body(), b"Binary Body")
+        
+    def test_get_body_json(self):
+        self.request.body = orjson.dumps({"message": "New Body"})
+        self.assertEqual(self.request.get_parsed_body(), {"message": "New Body"})
 
     def test_repr(self):
         expected_repr = f"<HttpRequest method={self.method} path={self.path} query_params={self.query_params} headers={self.headers} metadata={self.metadata}>"
@@ -88,13 +93,14 @@ class TestHttpRequest(unittest.TestCase):
         self.assertEqual(str(self.request), expected_str)
 
     def test_as_dict_default(self):
+        self.request.body = b"{\"message\": \"New Body\"}"
         expected_dict = {
             "method": self.method,
             "path": self.path,
             "query_params": {},
             "headers": self.headers,
             "metadata": {},
-            "body": self.body,
+            "body": {"message": "New Body"},
         }
         self.assertEqual(self.request.as_dict(), expected_dict)
 
@@ -108,7 +114,7 @@ class TestHttpRequest(unittest.TestCase):
             "query_params": {},
             "headers": self.headers,
             "metadata": self.request.metadata,
-            "body": self.body,
+            "body": self.body.decode("utf-8"),
             "logger": self.request.logger,
             "engine": self.request.engine,
             "orchestrator": self.request.orchestrator,
@@ -122,7 +128,7 @@ class TestHttpRequest(unittest.TestCase):
             "query_params": {},
             "headers": self.headers,
             "metadata": {},
-            "body": self.body,
+            "body": self.body.decode("utf-8"),
         }
         self.assertEqual(self.request.as_dict(show_components=False), expected_dict)
 

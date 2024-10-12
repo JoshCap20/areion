@@ -90,13 +90,18 @@ class HttpRequest:
         """
         return self.headers.get(key)
     
-    def get_parsed_body(self) -> dict:
+    def get_parsed_body(self) -> dict | str | None:
         """
         Parse the body of the request and return it as a dictionary.
         Returns:
-            dict: A dictionary containing the parsed body of the request.
+            dict or str or None: The parsed body of the request if it exists, otherwise None.
         """
-        return orjson.loads(self.body) if self.body else {}
+        if not self.body:
+            return None
+        try:
+            return orjson.loads(self.body)
+        except orjson.JSONDecodeError:
+            return self.body.decode("utf-8")
 
     def get_raw_body(self) -> str | None:
         """
@@ -241,7 +246,7 @@ class HttpRequestFactory:
         self.engine = engine
         self.orchestrator = orchestrator
 
-    def create(self, method, path, headers, body=None):
+    def create(self, method, path, headers, body: bytes = b"") -> HttpRequest:
         """
         Creates an HttpRequest with injected logger, engine, and orchestrator.
         """
