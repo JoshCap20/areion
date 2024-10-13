@@ -195,7 +195,7 @@ class HttpServer:
                         content_type="text/plain",
                         headers={"Allow": ", ".join(allowed_methods)},
                     )
-                    await self._send_response(writer, response)
+                    await self._send_response(writer, response, request)
                     break
 
                 # Handle OPTIONS and HEAD requests
@@ -226,7 +226,6 @@ class HttpServer:
                 response = HttpResponse(
                     status_code=e.status_code, body=e.message, content_type="text/plain"
                 )
-                self.log("warning", f"[RESPONSE] {e}")
                 
             except Exception as e:
                 # Handles all other exceptions
@@ -253,7 +252,7 @@ class HttpServer:
             else:
                 response.headers["Connection"] = "keep-alive"
 
-            await self._send_response(writer=writer, response=response)
+            await self._send_response(writer=writer, response=response, request=request)
 
     def _parse_headers(self, headers_data):
         try:
@@ -271,12 +270,17 @@ class HttpServer:
         except Exception as e:
             raise ValueError(f"Invalid headers: {e}")
 
-    async def _send_response(self, writer, response):
+    async def _send_response(self, writer, response, request: HttpRequest = None):
         # Recommended to use HttpResponse class for responses
         if not isinstance(response, HttpResponse):
             response = HttpResponse(body=response)
 
         # TODO: Add interceptor component here
+        if response.status_code != 200 and request:
+            self.log(
+                "warning",
+                f"{response} - {request.method} {request.path}",
+            )
 
         buffer = response.format_response()
         writer.write(buffer)
