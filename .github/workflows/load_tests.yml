@@ -4,10 +4,10 @@ on:
   push:
     branches:
       - main
-  pull_request:
+  pull_request_target:
     branches:
       - '**'
-
+      
 jobs:
   load-test:
     runs-on: ubuntu-latest
@@ -50,7 +50,8 @@ jobs:
           path: tests/load/load_test_results/
 
       - name: Post Load Test Results as Comment
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           path: tests/load/load_test_results/summary.md
+        
