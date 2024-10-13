@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock, patch, AsyncMock
-from .. import (
+from areion import (
     AreionServerBuilder,
     AreionServer,
     DEFAULT_HOST,

@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock
-from ... import HttpRequest, HttpRequestFactory, HttpResponse
+from areion import HttpRequest, HttpRequestFactory, HttpResponse
 import orjson
 import cgi
 from io import BytesIO

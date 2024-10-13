@@ -1,0 +1,57 @@
+name: Load Testing
+
+on:
+  push:
+    branches:
+      - main
+  pull_request_target:
+    branches:
+      - '**'
+      
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e .
+
+      - name: Install wrk
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wrk
+
+      - name: Run Load Tests
+        run: |
+          chmod +x tests/load/run_load_tests.sh
+          tests/load/run_load_tests.sh
+
+      - name: Parse Load Test Results
+        run: |
+          pip install pandas tabulate
+          python tests/load/parse_load_test_results.py
+
+      - name: Upload Load Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-results
+          path: tests/load/load_test_results/
+
+      - name: Post Load Test Results as Comment
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: tests/load/load_test_results/summary.md
+        

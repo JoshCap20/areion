@@ -4,7 +4,7 @@ from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, call
 
 import asyncio
-from ... import (
+from areion import (
     HttpServer,
     HttpResponse,
     HttpRequest,
@@ -244,6 +244,7 @@ class TestHttpServer(unittest.IsolatedAsyncioTestCase):
     async def test_handle_client_chunked_transfer_encoding(self):
         mock_reader = AsyncMock()
         mock_writer = MagicMock()
+        
 
         # Headers with Transfer-Encoding: chunked
         headers = b"GET /test HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n"

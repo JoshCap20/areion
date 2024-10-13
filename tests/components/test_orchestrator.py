@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock, patch
-from ... import DefaultOrchestrator
+from areion import DefaultOrchestrator
 from concurrent.futures import ThreadPoolExecutor
 
 
