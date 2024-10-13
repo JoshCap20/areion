@@ -54,7 +54,10 @@ class HttpServer:
         finally:
             if not writer.is_closing():
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
 
     async def _process_request(self, reader, writer):
         try:
