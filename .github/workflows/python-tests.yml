@@ -31,4 +31,4 @@ jobs:
     - name: Set PYTHONPATH and Test with pytest
       run: |
         export PYTHONPATH=$(pwd)
-        pytest
+        pytest -v tests/ --ignore=tests/load
