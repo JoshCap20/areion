@@ -1,0 +1,61 @@
+name: Load Testing
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e .
+
+      - name: Install wrk
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev git
+          git clone https://github.com/wg/wrk.git
+          cd wrk
+          make
+          sudo cp wrk /usr/local/bin
+          cd ..
+
+      - name: Run Load Tests
+        run: |
+          chmod +x tests/load/run_load_tests.sh
+          tests/load/run_load_tests.sh
+
+      - name: Parse Load Test Results
+        run: |
+          pip install pandas  # If your parsing script requires pandas
+          python tests/load/parse_load_test_results.py
+
+      - name: Upload Load Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-results
+          path: tests/load/load_test_results/
+
+      - name: Post Load Test Results as Comment
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: tests/load/load_test_results/summary.md
