@@ -31,12 +31,7 @@ jobs:
       - name: Install wrk
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev git
-          git clone https://github.com/wg/wrk.git
-          cd wrk
-          make
-          sudo cp wrk /usr/local/bin
-          cd ..
+          sudo apt-get install -y wrk
 
       - name: Run Load Tests
         run: |
@@ -45,7 +40,7 @@ jobs:
 
       - name: Parse Load Test Results
         run: |
-          pip install pandas  # If your parsing script requires pandas
+          pip install pandas tabulate
           python tests/load/parse_load_test_results.py
 
       - name: Upload Load Test Results
